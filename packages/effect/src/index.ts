@@ -1,4 +1,5 @@
 export * from "./accordion"
+export * from "./avatar"
 export * from "./checkbox"
 export * from "./collapsible"
 export * from "./field"

@@ -1,5 +1,6 @@
 import * as UiSchema from "@effect/ui/UiSchema"
 import * as Html from "@effect/ui/html/Html"
+import { Avatar } from "@ui-sdk/effect/avatar"
 import { Progress } from "@ui-sdk/effect/progress"
 import * as Schema from "effect/Schema"
 import { mountFixture } from "../../ssr/effect-mount"
@@ -36,6 +37,21 @@ const Fixture = Html.component({
               progress
                 .track(h.div.class("gauge-track"))
                 .children(progress.indicator(h.div.class("gauge-indicator")))
+            ),
+      }),
+      Avatar(h, {
+        view: (avatar) =>
+          avatar
+            .root(h.div.class("avatar"))
+            .children(
+              avatar.fallback(
+                h.span
+                  .class(
+                    "avatar-fallback",
+                    `is-${avatar.fallback.state().loadingStatus}`
+                  )
+                  .children("RF")
+              )
             ),
       }),
       h.button.on("click", FixtureMessage.ClickedFinish()).children("Finish"),

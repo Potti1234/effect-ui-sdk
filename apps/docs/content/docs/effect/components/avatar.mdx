@@ -1,0 +1,251 @@
+---
+title: Avatar
+description: Show an image with a fallback while it loads or if it fails.
+---
+
+Use an Avatar for a person or a team, like in a comment, a member list or an account menu. It shows initials or an icon until the image loads, and keeps showing them if the image fails.
+
+<ComponentExample
+  name="avatar/basic"
+  caption="The image replaces the initials once it loads. A screen reader can read the person's name in either state."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Avatar` is one headless component. Its `view` gets these parts:
+
+```text
+Avatar
+├── avatar.root
+├── avatar.image
+└── avatar.fallback
+```
+
+- `root` shares the image's loading state with its parts.
+- `image` renders the image.
+- `fallback` shows when no image is loaded.
+
+The image is a real `img`, including in server markup. The browser can start fetching it before hydration. The fallback stays visible until the image loads; if loading fails, the fallback remains.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Avatar } from "@ui-sdk/effect/avatar"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Avatar(h, {
+      view: (avatar) =>
+        avatar
+          .root(h.span)
+          .children(
+            avatar.image(h.img.attrs({ src: "/ada.png", alt: "Ada Lovelace" })),
+            avatar.fallback(h.span.children("AL"))
+          ),
+    }),
+})
+
+export { Example }
+```
+
+The fallback's part returns `undefined` while the image shows, so give it its children before you apply it.
+
+## Build Your Own
+
+`@ui-sdk/effect/avatar` comes with a ready-made Avatar. If you'd like to build your own, with your own names, start from the `avatar` primitive in `@ui-sdk/core`:
+
+```ts title="user-photo.ts"
+import { avatar } from "@ui-sdk/core/avatar"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const UserPhoto = createParts(avatar, {
+  name: "UserPhoto",
+  tags: { root: "span", image: "img", fallback: "span" },
+  names: { fallback: "initials" },
+  present: ["fallback"],
+})
+
+export { UserPhoto }
+```
+
+These are the same parts the ready-made Avatar is made of, with your names. See [Rendering](../rendering) and [Custom Rendering](#custom-rendering) for more.
+
+## Fallback Delay
+
+<span id="behavior-and-options" />
+
+Pass `delay` to the fallback to wait before showing it. This avoids flashing initials when an image loads quickly. Without a delay, the fallback appears immediately, including on the server.
+
+```ts
+avatar
+  .root(h.span)
+  .children(
+    avatar.image(
+      h.img.attrs({ src: "https://github.com/shadcn.png", alt: "shadcn" })
+    ),
+    avatar.fallback(h.span.children("CN"), { delay: 600 })
+  )
+```
+
+## Image Attributes
+
+Give the image element attributes such as `srcset`, `crossorigin`, and `referrerpolicy`. They work on the same `img` the browser loads. For avatars farther down a page, use `loading="lazy"`.
+
+```ts
+avatar.image(
+  h.img.attrs({
+    src: "https://github.com/shadcn.png",
+    srcset:
+      "https://github.com/shadcn.png?size=80 1x, https://github.com/shadcn.png?size=160 2x",
+    alt: "shadcn",
+    crossorigin: "anonymous",
+    referrerpolicy: "no-referrer",
+    loading: "lazy",
+  })
+)
+```
+
+<span id="render-functions" />
+
+## Interactive Avatar
+
+Use a button when clicking an avatar performs an action. Give it an accessible name that stays available while the image loads.
+
+```ts
+avatar
+  .root(
+    h.button
+      .attrs({ type: "button", "aria-label": "shadcn" })
+      .on("click", Message.ClickedProfile())
+  )
+  .children(
+    avatar.image(
+      h.img.attrs({ src: "https://github.com/shadcn.png", alt: "" })
+    ),
+    avatar.fallback(h.span.attr("aria-hidden", "true").children("CN"))
+  )
+```
+
+[Rendering](../rendering) explains how to apply a part to another element.
+
+## Loading Status
+
+`LoadingStatusChange` carries the new status and its reason. The possible statuses are `loading`, `loaded`, `error`, and `idle`.
+
+```ts
+Avatar(h, {
+  onEmit: {
+    LoadingStatusChange: ({ value, reason }) =>
+      value === "error"
+        ? Message.FailedImage({ reason: reason ?? "" })
+        : undefined,
+  },
+  view: (avatar) => userAvatar(avatar),
+})
+```
+
+When you replace a loaded image, the browser keeps it visible while the next source loads. A failed replacement shows the fallback. The event's reason explains why the status changed; see [Reasons](#reasons).
+
+## Custom Rendering
+
+Apply a part to any element's builder to render it as that element, and read its state with `state()`. Every part has the loading status, so the fallback can say something different when the image fails:
+
+```ts
+avatar.fallback(
+  h.span.children(
+    avatar.fallback.state().loadingStatus === "error" ? "?" : user.initials
+  )
+)
+```
+
+## Styling
+
+Set the root's size and let the image and fallback fill it. The image manages its own hidden styles until it loads; keep those styles intact when changing its element.
+
+Each part has a `data-slot`, such as `avatar-fallback`, and shows the loading status through the attributes listed under [Data Attributes](#data-attributes).
+
+## Data Attributes
+
+### root [#data-attributes-avatar]
+
+<DataAttributes component="avatar" part="root" />
+
+### image [#data-attributes-avatarimage]
+
+<DataAttributes component="avatar" part="image" />
+
+### fallback [#data-attributes-avatarfallback]
+
+<DataAttributes component="avatar" part="fallback" />
+
+## API Reference
+
+Props are the options below, without the callbacks, which are [events](#events).
+
+### Avatar
+
+<TypeTable
+  path="../../packages/core/src/components/avatar/avatar.ts"
+  name="AvatarOptions"
+/>
+
+### image
+
+The image. Apply it to a real `img`, so the browser can fetch it before hydration, with its attributes, such as `srcset`, `crossorigin` and `referrerpolicy`.
+
+### fallback
+
+<TypeTable
+  path="../../packages/core/src/components/avatar/avatar.ts"
+  name="AvatarFallbackProps"
+/>
+
+### State
+
+What `avatar.state` and every part's `state()` return. Every part gets the same state.
+
+<StateTable
+  path="../../packages/core/src/components/avatar/avatar.ts"
+  name="AvatarState"
+/>
+
+### Reasons
+
+An event's `reason` says why the status changed.
+
+<ReasonTable
+  path="../../packages/core/src/components/avatar/avatar.ts"
+  name="AvatarLoadingStatusChangeReason"
+/>
+
+### Events
+
+Each event carries plain data, for your messages and your tests.
+
+| Event                 | Carries                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| `LoadingStatusChange` | `{ value, reason, source }`: the image's status, and the [reason](#reasons) |
+
+## Accessibility
+
+Give the image meaningful `alt` text. Include the person's name in the fallback too, using visually hidden text if you only want to show initials.
+
+When a visible name beside the avatar already identifies the person, use an empty `alt` and hide decorative fallback content from screen readers.
+
+<SpecList spec="avatar" />

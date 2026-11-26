@@ -31,6 +31,7 @@
     ".": "./src/index.ts",
     "./accordion": "./src/accordion.ts",
     "./agent": "./src/agent.ts",
+    "./avatar": "./src/avatar.ts",
     "./checkbox": "./src/checkbox.ts",
     "./collapsible": "./src/collapsible.ts",
     "./color": "./src/color.ts",
@@ -72,6 +73,10 @@
       "./agent": {
         "types": "./dist/agent.d.ts",
         "default": "./dist/agent.js"
+      },
+      "./avatar": {
+        "types": "./dist/avatar.d.ts",
+        "default": "./dist/avatar.js"
       },
       "./checkbox": {
         "types": "./dist/checkbox.d.ts",

@@ -29,6 +29,7 @@
   "bugs": "https://github.com/vercel-labs/ui/issues",
   "exports": {
     ".": "./src/index.ts",
+    "./accordion": "./src/accordion.ts",
     "./agent": "./src/agent.ts",
     "./collapsible": "./src/collapsible.ts",
     "./color": "./src/color.ts",
@@ -53,6 +54,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./accordion": {
+        "types": "./dist/accordion.d.ts",
+        "default": "./dist/accordion.js"
       },
       "./agent": {
         "types": "./dist/agent.d.ts",

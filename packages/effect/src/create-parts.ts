@@ -16,6 +16,7 @@ import {
   present as isPresent,
   release,
   renderVersion,
+  sameSlotState,
   schemaOf,
   takeOwnId,
   unwatched,
@@ -43,6 +44,7 @@ type Call = {
   readonly value: unknown
   readonly reason?: string
   readonly source?: string
+  readonly key?: string
 }
 
 // What one instance of a component holds outside its Model: the core
@@ -52,7 +54,11 @@ class Handle {
   options: Record<string, unknown> | undefined
   callbacks:
     Record<string, (value: unknown, details?: Details) => void> | undefined
+  slotCallbacks: Record<string, (value: unknown, details?: Details) => void> =
+    {}
   parts = new Map<string, Part>()
+  // What the last render read of the instance, read again on every change.
+  reads: { value: unknown; again: () => unknown }[] = []
   emit: ((call: Call) => void) | undefined
 }
 
@@ -84,6 +90,7 @@ const PrimitiveMessage = UiSchema.TaggedEnum({
     value: Schema.Unknown,
     reason: Schema.optional(Schema.String),
     source: Schema.optional(Schema.String),
+    key: Schema.optional(Schema.String),
   },
   PressedCall: { method: Schema.String, args: Schema.Array(Schema.Unknown) },
 })
@@ -199,11 +206,20 @@ const keepInstance = (handle: Handle) =>
         return
       }
       let version = renderVersion(instance)
+      let renders = 0
+      // State that affects rendering renders again, and so does live state,
+      // like an item's index, but only when the last render read it.
       const changed = () => {
         const next = renderVersion(instance)
-        if (next !== version) {
+        const read = handle.reads.some(
+          ({ value, again }) => !sameSlotState(value, again())
+        )
+        if (next !== version || read) {
           version = next
-          Queue.offerUnsafe(queue, PrimitiveMessage.ChangedState({ version }))
+          Queue.offerUnsafe(
+            queue,
+            PrimitiveMessage.ChangedState({ version: ++renders })
+          )
         }
       }
       handle.emit = (call) =>
@@ -228,19 +244,27 @@ const keepInstance = (handle: Handle) =>
 // in the page. Their details become plain data: what changed, why and how.
 function callbacksOf(handle: Handle, names: string[]) {
   return (handle.callbacks ??= Object.fromEntries(
-    names.map((name) => [
-      name,
-      (value: unknown, details?: Details) => {
-        handle.emit?.({
-          name,
-          value,
-          ...(details?.reason === undefined ? {} : { reason: details.reason }),
-          ...(details?.source === undefined ? {} : { source: details.source }),
-        })
-      },
-    ])
+    names.map((name) => [name, relay(handle, eventName(name))])
   ))
 }
+
+// A callback that relays its call as the event `tag`, with the key of the
+// part it belongs to, like an accordion item's.
+const relay =
+  (handle: Handle, tag: string, key?: string) =>
+  (value: unknown, details?: Details) => {
+    handle.emit?.({
+      name: tag,
+      value,
+      ...(details?.reason === undefined ? {} : { reason: details.reason }),
+      ...(details?.source === undefined ? {} : { source: details.source }),
+      ...(key === undefined ? {} : { key }),
+    })
+  }
+
+// The event a slot's callback prop is, like an item's `onOpenChange`: `ItemOpenChange`.
+const slotEventName = (slot: string, prop: string) =>
+  camel(slot).replace(/^./, (first) => first.toUpperCase()) + eventName(prop)
 
 function sameOptions(
   a: Record<string, unknown> | undefined,
@@ -347,19 +371,31 @@ function createParts<
   const props = Schema.Struct(fields) as unknown as Schema.Codec<
     Record<string, unknown>
   >
-  const events = UiSchema.TaggedEnum(
-    Object.fromEntries(
-      callbacks.map((name) => [
-        eventName(name),
-        {
-          value: Schema.Unknown,
-          reason: Schema.optional(Schema.String),
-          source: Schema.optional(Schema.String),
-        },
-      ])
-    )
-  ) as any
   const slots = Object.keys(options.tags)
+  const slotCallbacks = Object.fromEntries(
+    slots.map((slot) => [
+      slot,
+      Object.keys(slotSchemas[slot] ?? {}).filter((prop) =>
+        isCallback(slotSchemas[slot][prop])
+      ),
+    ])
+  )
+  const payload = {
+    value: Schema.Unknown,
+    reason: Schema.optional(Schema.String),
+    source: Schema.optional(Schema.String),
+  }
+  const events = UiSchema.TaggedEnum(
+    Object.fromEntries([
+      ...callbacks.map((name) => [eventName(name), payload]),
+      ...slots.flatMap((slot) =>
+        slotCallbacks[slot].map((prop) => [
+          slotEventName(slot, prop),
+          { ...payload, key: Schema.optional(Schema.String) },
+        ])
+      ),
+    ])
+  ) as any
   const definitions = (
     primitive as unknown as { slots: Record<string, object> }
   ).slots
@@ -413,7 +449,7 @@ function createParts<
       ChangedState: ($: any, { version }: { version: number }) =>
         $.evolve({ version }),
       CalledCallback: ($: any, { name, ...payload }: Call) =>
-        $.emit(events[eventName(name)](payload)),
+        $.emit(events[name](payload)),
       PressedCall: (
         $: any,
         { method, args }: { method: string; args: readonly unknown[] }
@@ -473,6 +509,17 @@ function createParts<
             )
           }
         }
+        const key = String(resolved.id ?? resolved.value ?? "")
+        for (const prop of slotCallbacks[slot]) {
+          if (resolved[prop] === undefined) {
+            const tag = slotEventName(slot, prop)
+            resolved[prop] = handle.slotCallbacks[`${tag}:${key}`] ??= relay(
+              handle,
+              tag,
+              key
+            )
+          }
+        }
         const listKey = keyProps[slot]
         if (listKey && resolved[listKey] !== undefined) {
           resolved.id = (
@@ -496,9 +543,19 @@ function createParts<
               : undefined,
         }
       )
+      handle.reads = []
+      const track = <T>(again: () => T) => {
+        const value = again()
+        handle.reads.push({ value, again })
+        return value
+      }
       const build = (around: Around): Record<string, unknown> => {
         const result: Record<string, unknown> = {
-          state: "root" in definitions ? partState(instance.part("root")) : {},
+          get state() {
+            return "root" in definitions
+              ? track(() => partState(instance.part("root")))
+              : {}
+          },
           calls,
           in: (slot: string, given?: Record<string, unknown>) => {
             const resolved = resolve(slot, given, around)
@@ -518,14 +575,16 @@ function createParts<
               decorated[slot],
               (builder: any, given?: Record<string, unknown>) => {
                 const resolved = resolve(slot, given, around)
-                return isPresent(instance.part(slot, resolved))
+                return track(() => isPresent(instance.part(slot, resolved)))
                   ? decorated[slot](builder, resolved)
                   : undefined
               }
             ),
             {
-              state: (given?: Record<string, unknown>) =>
-                partState(read(given)),
+              state: (given?: Record<string, unknown>) => {
+                const part = read(given)
+                return track(() => partState(part))
+              },
             }
           )
         }
@@ -537,7 +596,7 @@ function createParts<
 
   return component as unknown as Component.Headless<
     EffectProps<P>,
-    EffectEvents<P>,
+    EffectEvents<P, Tags>,
     EffectParts<P, Tags, Present>
   >
 }
@@ -569,8 +628,12 @@ type Callback<P extends Primitive, K> =
 type EffectProps<P extends Primitive> = {
   readonly [
     K in Exclude<keyof OptionsOf<P> & string, CallbackKeys<OptionsOf<P>>>
-  ]?: OptionsOf<P>[K & keyof OptionsOf<P>]
+  ]?: Loosen<OptionsOf<P>[K & keyof OptionsOf<P>]>
 } & { readonly id?: string }
+
+// An Effect UI Model's arrays are readonly, and core never writes to an
+// option's, so a prop takes either.
+type Loosen<T> = T extends (infer Item)[] ? readonly Item[] | T : T
 
 /**
  * The events an Effect UI component emits, one per callback option:
@@ -578,19 +641,45 @@ type EffectProps<P extends Primitive> = {
  * of a change.
  * @experimental
  */
-type EffectEvents<P extends Primitive> = {
-  [K in CallbackKeys<OptionsOf<P>>]: K extends `on${infer Name}`
-    ? {
-        readonly _tag: Name
-        readonly value: Callback<P, K>[0]
-        readonly reason?: Callback<P, K>[1] extends
-          { reason: infer R } | undefined
-          ? R
-          : never
-        readonly source?: string
-      }
+type EffectEvents<P extends Primitive, Tags = {}> =
+  | {
+      [K in CallbackKeys<OptionsOf<P>>]: K extends `on${infer Name}`
+        ? {
+            readonly _tag: Name
+            readonly value: Callback<P, K>[0]
+            readonly reason?: ReasonOf<Callback<P, K>[1]>
+            readonly source?: string
+          }
+        : never
+    }[CallbackKeys<OptionsOf<P>>]
+  | SlotEvents<P, Tags>
+
+type ReasonOf<Details> = Details extends { reason: infer R } | undefined
+  ? R
+  : never
+
+type SlotCallback<P extends Primitive, S extends SlotName<P>, K> =
+  NonNullable<PropsOf<P, S>[K & keyof PropsOf<P, S>]> extends (
+    ...args: infer A
+  ) => any
+    ? A
     : never
-}[CallbackKeys<OptionsOf<P>>]
+
+// The events of the slots' callback props, like an accordion item's
+// `onOpenChange`, which is `ItemOpenChange` with the item's key.
+type SlotEvents<P extends Primitive, Tags> = {
+  [S in keyof Tags & SlotName<P>]: {
+    [K in CallbackKeys<PropsOf<P, S>>]: K extends `on${infer Name}`
+      ? {
+          readonly _tag: `${Capitalize<CamelCase<S>>}${Name}`
+          readonly value: SlotCallback<P, S, K>[0]
+          readonly reason?: ReasonOf<SlotCallback<P, S, K>[1]>
+          readonly source?: string
+          readonly key?: string
+        }
+      : never
+  }[CallbackKeys<PropsOf<P, S>>]
+}[keyof Tags & SlotName<P>]
 
 /**
  * A part: give it the builder of the element to render, and it returns the

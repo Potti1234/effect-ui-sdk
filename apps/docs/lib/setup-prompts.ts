@@ -111,6 +111,23 @@ const stacks = [
     ],
   },
   {
+    id: "effect",
+    name: "Effect UI",
+    pkg: "effect",
+    needs:
+      "It needs Effect 4 and @effect/ui, installed from a snapshot build until it's on npm.",
+    projects: [
+      {
+        id: "vite",
+        name: "Vite",
+        create: "npm create vite@latest . -- --template vanilla-ts",
+        steps: [
+          `Add optimizeDeps: { exclude: ["@ui-sdk/core"] } to vite.config.ts, so the app and @ui-sdk/effect share one copy of the core in development.`,
+        ],
+      },
+    ],
+  },
+  {
     id: "web-components",
     name: "Web Components",
     pkg: "web",

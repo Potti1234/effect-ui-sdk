@@ -28,6 +28,13 @@ const frameworks = {
     ext: "tsx",
     lang: "tsx",
   },
+  effect: {
+    label: "Effect UI",
+    short: "Effect",
+    example: "effect",
+    ext: "ts",
+    lang: "ts",
+  },
 } as const
 
 type Framework = keyof typeof frameworks
@@ -43,13 +50,17 @@ const isCallback = (name: string) => /^on[A-Z]/.test(name)
 
 /**
  * A callback's name as a framework writes it: `onOpenChange` in React, Svelte
- * and Solid, `@open-change` in Vue, and the `openchange` event on web components. Names that aren't callbacks come back as they are.
+ * and Solid, `@open-change` in Vue, the `openchange` event on web components,
+ * and the `OpenChange` event in Effect UI. Names that aren't callbacks come back as they are.
  */
 function callbackIn(name: string, framework: Framework) {
   if (!isCallback(name)) {
     return name
   }
   const words = name.slice(2)
+  if (framework === "effect") {
+    return words
+  }
   if (framework === "vue") {
     return `@${words.replace(/(?<!^)([A-Z])/g, "-$1").toLowerCase()}`
   }

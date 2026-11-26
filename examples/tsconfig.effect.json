@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "include": [
+    "*/effect/*.ts",
+    "components/*/effect/*.ts",
+    "mount/effect.ts",
+    "prerender/effect.ts"
+  ],
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "types": ["vite/client"]
+  }
+}

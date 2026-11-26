@@ -1,0 +1,37 @@
+---
+title: Introduction
+description: Use unstyled Effect UI components with keyboard, focus, and screen reader support built in.
+---
+
+<Callout>
+
+These docs cover ui-sdk in Effect UI. Using another framework? See [React](/docs/react), [Vue](/docs/vue), [Svelte](/docs/svelte), [Solid](/docs/solid) or [Web Components](/docs/web-components). To build your own components from behaviors, see [Core](/docs/core).
+
+</Callout>
+
+`@ui-sdk/effect` gives you components such as Collapsible as Effect UI headless components, built on ui-sdk's behaviors. They handle interactions, focus, and ARIA attributes. You choose their markup and styles.
+
+Each component is a headless component: call it in your view with `h`, apply its parts to your own elements, and handle its events in your `update`. Its state can live in your Model, so every change is a message you can log, replay and test.
+
+## Quick Start
+
+Copy this prompt into your agent:
+
+<include>../../shared/setup-prompt/effect.mdx</include>
+
+It installs ui-sdk and points your `AGENTS.md` at the docs that ship with the packages.
+
+## Set It Up Yourself
+
+<Cards>
+  <Card
+    title="Installation"
+    href="./installation"
+    description="Install the packages in your Effect UI app."
+  />
+  <Card
+    title="State and Events"
+    href="./state-and-events"
+    description="Keep a component's state in your Model, and decide each change."
+  />
+</Cards>

@@ -26,6 +26,7 @@ const builds: Record<
     config: (ssr) => ({ plugins: [solid({ include: solidFiles, ssr })] }),
   },
   web: { ext: "ts" },
+  effect: { ext: "ts" },
 }
 
 // The docs hand the React examples their own React, Next's copy, so a page runs
@@ -67,6 +68,7 @@ const examplesFolder = import.meta.dirname
 const sharedStylesheets = ["styles/tokens.css", "styles/base.css"]
 const stylesheets = new Map(
   globSync(["*/*.css", "components/*/*.css"])
+    .map((file) => file.split(path.sep).join("/"))
     .filter((file) => !sharedStylesheets.includes(file))
     .sort()
     .map((file) => [path.basename(file, ".css"), file])
@@ -170,6 +172,7 @@ export default defineConfig(({ mode, isSsrBuild = false }) => {
 
   const entries = Object.fromEntries(
     globSync([`*/${framework}/*.${ext}`, `components/*/${framework}/*.${ext}`])
+      .map((file) => file.split(path.sep).join("/"))
       .map((file) => [
         file
           .replace(/^components\//, "")

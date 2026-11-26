@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.vue.json && node ../scripts/tsgo.mjs --noEmit -p tsconfig.react.json && svelte-check --tsconfig ./tsconfig.svelte.json --fail-on-warnings && node ../scripts/tsgo.mjs --noEmit -p tsconfig.solid.json"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.vue.json && node ../scripts/tsgo.mjs --noEmit -p tsconfig.react.json && svelte-check --tsconfig ./tsconfig.svelte.json --fail-on-warnings && node ../scripts/tsgo.mjs --noEmit -p tsconfig.solid.json && node ../scripts/tsgo.mjs --noEmit -p tsconfig.effect.json"
   },
   "dependencies": {
     "@lucide/svelte": "1.54.0",
@@ -25,7 +25,10 @@
     "react-dom": "catalog:",
     "solid-js": "catalog:",
     "svelte": "catalog:",
-    "vue": "catalog:"
+    "vue": "catalog:",
+    "@ui-sdk/effect": "workspace:*",
+    "@effect/ui": "https://pkg.pr.new/Effect-TS/ui/@effect/ui@c73e7ce",
+    "effect": "^4.1.4"
   },
   "devDependencies": {
     "@solidjs/vite-plugin": "catalog:",

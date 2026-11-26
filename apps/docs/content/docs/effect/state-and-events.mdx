@@ -1,0 +1,136 @@
+---
+title: State and Events
+description: Keep a component's state in your Model, decide each change in update, and respond to events.
+---
+
+Components manage their own state unless you pass a controlled value. In Effect UI, that value lives in your Model, and every change the component asks for reaches your `update` as an event, with what it wants and why.
+
+## Set the Starting Value
+
+Use a default prop to choose the starting state. Here, the panel starts open, and opens and closes on its own after that:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Collapsible } from "@ui-sdk/effect/collapsible"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Collapsible(h, {
+      props: { defaultOpen: true },
+      view: (collapsible) =>
+        collapsible
+          .root(h.div)
+          .children(
+            collapsible.trigger(h.button).children("Order details"),
+            collapsible.panel(h.div.children("2 × Linen shirt"))
+          ),
+    }),
+})
+
+export { Example }
+```
+
+The prop depends on the component: `defaultPressed`, `defaultChecked`, `defaultOpen`, or `defaultValue`.
+
+## Control the Value
+
+Keep the value in your Model, pass it as a prop, and change it in `update` when the component's event arrives:
+
+```ts
+import * as UiSchema from "@effect/ui/UiSchema"
+import * as Html from "@effect/ui/html/Html"
+import { Collapsible } from "@ui-sdk/effect/collapsible"
+import * as Schema from "effect/Schema"
+
+const ExampleMessage = UiSchema.TaggedEnum({
+  RequestedOpenChangeDetails: { open: Schema.Boolean },
+})
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Struct({ open: Schema.Boolean }),
+  message: ExampleMessage,
+}).make({
+  init: () => ({ open: false }),
+  update: {
+    RequestedOpenChangeDetails: ($, { open }) => $.evolve({ open }),
+  },
+  view: (h, model) =>
+    h.div(
+      Collapsible(h, {
+        props: { open: model.open },
+        onEmit: (event) =>
+          event._tag === "OpenChange"
+            ? ExampleMessage.RequestedOpenChangeDetails({ open: event.value })
+            : undefined,
+        view: (collapsible) =>
+          collapsible
+            .root(h.div)
+            .children(
+              collapsible.trigger(h.button).children("Order details"),
+              collapsible.panel(h.div.children("2 × Linen shirt"))
+            ),
+      }),
+      h.output.children(model.open ? "Open" : "Closed")
+    ),
+})
+
+export { Example }
+```
+
+Pressing the trigger changes both the panel and the output. If `update` leaves the Model as it is, the panel keeps its current state: refusing a change is returning `$.model`.
+
+Other components use `pressed`, `checked` or `value`. Each part reads the prop you pass, so there's one source for the value: your Model.
+
+## Respond to a Change
+
+Each callback option is an event, named after it without `on`: `onOpenChange` is `OpenChange`, and `onOpenChangeComplete` is `OpenChangeComplete`. An event carries plain data, so it can go in a message, the log and a test.
+
+| Field    | What It Tells You                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| `value`  | The requested value, like the new `open`.                                                        |
+| `reason` | What requested the change, such as `trigger-press` or `find-in-page`. Each component lists them. |
+| `source` | `keyboard`, `mouse`, `touch`, `pen`, `virtual`, `programmatic`, or `agent`.                      |
+
+Handle every event with `onEmit` as a record with one handler per event, or as a function that returns `undefined` for the events you leave alone. Name the message for what the event asks, as the [Effect UI naming guide](https://ui.effect.website) does: `OpenChange` from a collapsible of order details is `RequestedOpenChangeDetails`.
+
+Where React and Solid call `details.cancel()`, keep the value in your Model and don't change it. A change you refuse never reaches the page.
+
+## Read the State
+
+A part's state is on the parts the `view` closure gets, as `collapsible.state`. Read it to change what you render, like a label:
+
+```ts
+collapsible.trigger(h.button).children(collapsible.state.open ? "Hide" : "Show")
+```
+
+State attributes like `data-open` are on every part too, for your styles.
+
+## Change It From Outside
+
+Create a controller with `createCollapsibleController()` and pass it as the `controller` prop. Its methods change the component as if its own trigger was pressed, so with a controlled value, the change still arrives as an event for your `update` to decide. Call them from a Command:
+
+```ts
+import * as Command from "@effect/ui/Command"
+import * as Component from "@effect/ui/Component"
+import { createCollapsibleController } from "@ui-sdk/effect/collapsible"
+import * as Effect from "effect/Effect"
+
+const details = createCollapsibleController()
+
+const ToggleDetails = Command.make("ToggleDetails", { args: {} }, () =>
+  Effect.sync(() => {
+    details.toggle()
+    return Component.noop
+  })
+)
+```
+
+Then `$.run(ToggleDetails.make({}))` in `update` toggles it, and your Story tests see the Command by name.

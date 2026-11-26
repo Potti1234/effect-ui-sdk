@@ -1,0 +1,287 @@
+---
+title: Collapsible
+description: Show and hide a panel, preserve its contents, and animate its height.
+---
+
+Use a collapsible to show and hide one panel of content. For a set of panels, use an accordion.
+
+<ComponentExample
+  name="collapsible/basic"
+  caption="Press Order #4189, or focus it and press Enter or Space, to show the items."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Collapsible` is one headless component. Its `view` gets these parts:
+
+```text
+Collapsible
+├── collapsible.root
+├── collapsible.trigger
+└── collapsible.panel
+```
+
+Apply each part to an element of your own: a div for the root and panel, and a native button for the trigger. Put other content around them, like a heading or a summary that always shows.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Collapsible } from "@ui-sdk/effect/collapsible"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Collapsible(h, {
+      view: (collapsible) =>
+        collapsible
+          .root(h.div)
+          .children(
+            collapsible.trigger(h.button).children("Order details"),
+            collapsible.panel(h.div.children("2 × Linen shirt"))
+          ),
+    }),
+})
+
+export { Example }
+```
+
+The panel part returns `undefined` while the panel is out of the page, so give it its children before you apply it: `collapsible.panel(h.div.children(...))`.
+
+## Build Your Own
+
+`@ui-sdk/effect/collapsible` comes with a ready-made Collapsible. If you'd like to build your own, with your own names, start from the `collapsible` primitive in `@ui-sdk/core`:
+
+```ts title="spoiler.ts"
+import { collapsible } from "@ui-sdk/core/collapsible"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const Spoiler = createParts(collapsible, {
+  name: "Spoiler",
+  tags: { root: "div", trigger: "button", panel: "div" },
+})
+
+export { Spoiler }
+```
+
+```ts
+Spoiler(h, {
+  view: (spoiler) =>
+    spoiler
+      .root(h.div)
+      .children(
+        spoiler.trigger(h.button).children("Show the ending"),
+        spoiler.panel(h.div.children("The butler did it."))
+      ),
+})
+```
+
+Each part keeps the behavior, state and data attributes of its ready-made counterpart.
+
+## Disabled
+
+Pass `disabled` to stop its trigger from opening or closing the panel. The trigger stays in the tab order and reports `aria-disabled="true"`. A disabled `<fieldset>` around the collapsible disables it too.
+
+```ts
+Collapsible(h, {
+  props: { disabled: true },
+  view: (collapsible) =>
+    collapsible
+      .root(h.div)
+      .children(
+        collapsible.trigger(h.button).children("Gift options"),
+        collapsible.panel(h.div.children("Add a gift message and wrapping."))
+      ),
+})
+```
+
+## Keep Mounted
+
+Panels unmount when they close, so Tab skips their contents. Pass `keepMounted` to the panel to keep it mounted and hidden, so a field keeps what you typed into it.
+
+<ComponentExample
+  name="collapsible/keep-mounted"
+  caption="Open Add a delivery note, type a note, then close and reopen the panel. Your note is still there."
+/>
+
+## Find in Page
+
+Pass `hiddenUntilFound` to the panel to keep it in the DOM as `hidden="until-found"`. Browser Find and links to content inside the panel can reveal it. The panel opens without an animation so the match is visible immediately.
+
+`HtmlServer` renders `hidden="until-found"` on the server, so the closed panel is findable before hydration.
+
+<ComponentExample
+  name="collapsible/find-in-page"
+  caption="Leave Ingredients closed. Open your browser's Find command and search for cardamom to reveal the panel."
+/>
+
+## Controlled
+
+Keep `open` in your Model, pass it as a prop, and change it in `update` when `OpenChange` arrives. To refuse a change, leave the Model as it is. See [State and Events](../state-and-events).
+
+For a button elsewhere on the page, create a [controller](#controller) with `createCollapsibleController()`, pass it as `controller`, and call it from a Command. Its changes reach your `update` as `OpenChange` too. Create one controller per mounted collapsible.
+
+<ComponentExample
+  name="collapsible/controlled"
+  caption="Open Recovery codes with Toggle or its trigger, then press Done. The console logs each change and its reason, and Done returns focus to the trigger."
+/>
+
+## Animation
+
+Animate the measured `--collapsible-panel-height` between zero and the content's height. `data-starting-style` marks the opening frame, and `data-ending-style` stays on while it closes. The panel stays mounted until its closing animation finishes, and a panel open on its first paint doesn't animate.
+
+```css
+[data-slot="collapsible-panel"] {
+  height: var(--collapsible-panel-height);
+  overflow: hidden;
+  transition: height 0.2s ease-out;
+
+  &:is([data-starting-style], [data-ending-style]) {
+    height: 0;
+  }
+}
+```
+
+`OpenChangeComplete` reports when opening or closing has finished.
+
+<ComponentExample
+  name="collapsible/animation"
+  caption="Open and close Release notes. The console logs when each animation finishes."
+/>
+
+## Custom Rendering
+
+Apply a part to any element's builder to render it as that element, and read `collapsible.state` to change what you render. The trigger below renders inside a heading, and the panel renders as an ordered list.
+
+<ComponentExample
+  name="collapsible/render"
+  caption="Press Track parcel to open the ordered list. The summary changes from Arrives Thursday to 3 updates."
+/>
+
+## Styling
+
+Use `data-open`, `data-closed` and `data-disabled` to style each state. The examples turn their chevron from the trigger's `data-open`.
+
+Each part has a `data-slot`, such as `collapsible-panel`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+### collapsible.panel [#styling-collapsiblepanel]
+
+<CssVariables component="collapsible" part="panel" />
+
+## Data Attributes
+
+### collapsible.root [#data-attributes-collapsible]
+
+<DataAttributes component="collapsible" part="root" />
+
+### collapsible.trigger [#data-attributes-collapsibletrigger]
+
+<DataAttributes component="collapsible" part="trigger" />
+
+### collapsible.panel [#data-attributes-collapsiblepanel]
+
+<DataAttributes component="collapsible" part="panel" />
+
+## API Reference
+
+Props are the options below, without the callbacks, which are [events](#events).
+
+### Collapsible
+
+<TypeTable
+  path="../../packages/core/src/components/collapsible/collapsible.ts"
+  name="CollapsibleOptions"
+/>
+
+### collapsible.trigger
+
+The trigger takes no options of its own, only the attributes of the element you apply it to.
+
+### collapsible.panel
+
+Pass these as the part's second argument: `collapsible.panel(h.div, { keepMounted: true })`.
+
+<TypeTable
+  path="../../packages/core/src/components/collapsible/collapsible.ts"
+  name="CollapsiblePanelProps"
+/>
+
+### State
+
+What `collapsible.state` holds.
+
+<StateTable
+  path="../../packages/core/src/components/collapsible/collapsible.ts"
+  name="CollapsibleState"
+/>
+
+### Reasons
+
+An event's `reason` says why the panel opened or closed.
+
+<ReasonTable
+  path="../../packages/core/src/components/collapsible/collapsible.ts"
+  name="CollapsibleOpenChangeReason"
+/>
+
+### Controller
+
+Create one with `createCollapsibleController()` and pass it as `controller`.
+
+Every write method takes an optional `{ reason, event }`, and returns `false` when the change was canceled or changed nothing.
+
+<ControllerTable
+  path="../../packages/core/src/components/collapsible/collapsible.ts"
+  name="CollapsibleController"
+/>
+
+### Events
+
+Each event carries plain data, for your messages and your tests.
+
+| Event                | Carries                                                                      |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `OpenChange`         | `{ value, reason, source }`: the requested state, and the [reason](#reasons) |
+| `OpenChangeComplete` | `{ value }`, after the panel's animation                                     |
+
+## Accessibility
+
+The collapsible follows the [WAI-ARIA disclosure pattern](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/). The trigger says whether the panel is open with `aria-expanded`, and points to the panel with `aria-controls` while it's mounted. Every line below is an automated test.
+
+### Keyboard
+
+| Key          | Does                                                   |
+| ------------ | ------------------------------------------------------ |
+| Enter, Space | Opens or closes the panel. Focus stays on the trigger. |
+| Tab          | Moves from the trigger into an open panel              |
+
+Closing a panel while focus is inside it moves focus back to the trigger.
+
+### Tested Behavior
+
+<SpecList
+  spec="collapsible"
+  only={["opening and closing", "keyboard", "mounting"]}
+/>
+
+Beyond the pattern's baseline:
+
+<SpecList spec="collapsible.enhancements" />
+
+Screen readers hear the same thing in each tested framework, recorded by a virtual screen reader:
+
+<SpecList spec="collapsible.sr" />

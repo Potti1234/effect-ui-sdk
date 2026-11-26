@@ -1,0 +1,12 @@
+{
+  "title": "Effect UI",
+  "pages": [
+    "---Get Started---",
+    "index",
+    "installation",
+    "---Using Components---",
+    "state-and-events",
+    "---Build Your Own---",
+    "components"
+  ]
+}

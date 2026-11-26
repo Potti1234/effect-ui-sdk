@@ -1,0 +1,75 @@
+{
+  "name": "@ui-sdk/effect",
+  "version": "0.1.0-beta.17",
+  "description": "UI SDK for Effect UI.",
+  "keywords": [
+    "effect",
+    "effect-ui",
+    "ui",
+    "ui-sdk",
+    "behaviors",
+    "accessibility",
+    "a11y",
+    "aria",
+    "keyboard",
+    "focus",
+    "headless",
+    "unstyled",
+    "components",
+    "agents"
+  ],
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://ui-sdk.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vercel-labs/ui.git",
+    "directory": "packages/effect"
+  },
+  "bugs": "https://github.com/vercel-labs/ui/issues",
+  "exports": {
+    ".": "./src/index.ts",
+    "./primitive": "./src/primitive.ts",
+    "./collapsible": "./src/collapsible.ts"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "docs"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./primitive": {
+        "types": "./dist/primitive.d.ts",
+        "default": "./dist/primitive.js"
+      },
+      "./collapsible": {
+        "types": "./dist/collapsible.d.ts",
+        "default": "./dist/collapsible.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build/build-package.mjs",
+    "prepack": "cp ../../LICENSE LICENSE",
+    "typecheck": "node ../../scripts/tsgo.mjs --noEmit && node ../../scripts/tsgo.mjs --noEmit -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@effect/ui": "*",
+    "@ui-sdk/core": "workspace:^",
+    "effect": "^4.1.4"
+  },
+  "devDependencies": {
+    "@effect/ui": "https://pkg.pr.new/Effect-TS/ui/@effect/ui@c73e7ce",
+    "@ui-sdk/core": "workspace:*",
+    "effect": "^4.1.4",
+    "happy-dom": "^21.0.4",
+    "typescript": "catalog:",
+    "vitest": "^5.0.3"
+  }
+}

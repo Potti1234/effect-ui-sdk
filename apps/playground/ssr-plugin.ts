@@ -15,6 +15,7 @@ type Renderer = {
 const renderers: Record<string, string> = {
   svelte: "/src/ssr.ts",
   vue: "/src/ssr/vue.ts",
+  effect: "/src/ssr/effect.ts",
 }
 
 function ssrFixtures() {

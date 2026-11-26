@@ -2,16 +2,17 @@
 // `node scripts/build.mjs react styles`. Each framework but web is also
 // rendered to HTML in Node, which the docs show until an example mounts.
 import { writeFile } from "node:fs/promises"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { build } from "vite"
 
-const all = ["react", "vue", "svelte", "solid", "web", "styles"]
+const all = ["react", "vue", "svelte", "solid", "web", "effect", "styles"]
 const named = process.argv.slice(2)
 const unknown = named.filter((framework) => !all.includes(framework))
 if (unknown.length) {
   throw new Error(`No examples build for ${unknown.join(", ")}`)
 }
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 await Promise.all(
   (named.length ? named : all).map(async (mode) => {
     await build({ root, mode, logLevel: "warn" })
@@ -24,7 +25,7 @@ await Promise.all(
 async function prerender(mode) {
   await build({ root, mode, logLevel: "warn", build: { ssr: true } })
   const { examples, render } = await import(
-    `${root}node_modules/.prerender/${mode}/${mode}.js`
+    pathToFileURL(`${root}node_modules/.prerender/${mode}/${mode}.js`).href
   )
   const html = {}
   const failed = []

@@ -50,7 +50,8 @@
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
     "./text-match": "./src/text-match.ts",
-    "./toggle": "./src/toggle.ts"
+    "./toggle": "./src/toggle.ts",
+    "./toolbar": "./src/toolbar.ts"
   },
   "sideEffects": false,
   "files": [
@@ -150,6 +151,10 @@
       "./toggle": {
         "types": "./dist/toggle.d.ts",
         "default": "./dist/toggle.js"
+      },
+      "./toolbar": {
+        "types": "./dist/toolbar.d.ts",
+        "default": "./dist/toolbar.js"
       }
     }
   },

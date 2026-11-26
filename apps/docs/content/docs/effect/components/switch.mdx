@@ -1,0 +1,239 @@
+---
+title: Switch
+description: Turn a setting on or off.
+---
+
+Use a switch for a setting that takes effect as soon as it changes, like Airplane mode or a notification preference. Keep its label the same in both states: the label says what the setting is, and the switch shows whether it's on.
+
+<ComponentExample
+  name="switch/basic"
+  caption="Click Airplane mode, or focus the switch and press Space, to turn it on and off."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Switch` is one headless component. Its `view` gets these parts:
+
+```text
+Switch
+├── parts.root
+│   └── parts.thumb
+└── parts.input
+```
+
+Apply the root to a button and put the thumb inside it. The `input` part is the hidden native checkbox that takes part in forms: put it beside the button. Wrap the switch and its text in a label. The thumb stays mounted and gets the switch's state, so CSS can slide it from one end to the other.
+
+`switch` is a reserved word, so name the `view` closure's argument `parts`.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Switch } from "@ui-sdk/effect/switch"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Switch(h, {
+      view: (parts) =>
+        h.label.children(
+          "Airplane mode",
+          parts.root(h.button).children(parts.thumb(h.span)),
+          parts.input(h.input)
+        ),
+    }),
+})
+
+export { Example }
+```
+
+## Description
+
+Use a [Field](./field)'s `label` and `description` when a setting needs more explanation. Apply the field's `control` to the switch's root, `field.control(parts.root(h.button))`, and the field connects both to the switch.
+
+<ComponentExample
+  name="switch/description"
+  caption="Click Weekly digest. The field connects the label and description to the switch."
+/>
+
+## Choice Card
+
+A setting can fill a whole card. Here the label's `::after` covers the card, so a click anywhere on it toggles the switch, and `:has([data-checked])` marks the cards that are on.
+
+<ComponentExample
+  name="switch/choice-card"
+  caption="Click anywhere on the Public profile card to turn it on. Each card's switch keeps its own value."
+/>
+
+## Disabled
+
+`disabled` prevents focus and changes, and leaves the switch out of form submissions. A disabled `fieldset` does the same.
+
+<ComponentExample
+  name="switch/disabled"
+  caption="Security alerts are always on, so that switch is disabled. Clicking it leaves it on, and Tab skips it."
+/>
+
+## Read-Only
+
+`readOnly` keeps the switch focusable and included in form submissions, while preventing the user from changing it. Use it for a setting managed somewhere else.
+
+<ComponentExample
+  name="switch/read-only"
+  caption="Tab to Encrypt backups. Space and clicks leave it on."
+/>
+
+## Controlled
+
+Keep `checked` in your Model, pass it as a prop, and change it in `update` when `CheckedChange` arrives. A [controller](#controller) from `createSwitchController()` changes it from anywhere, like the Toggle button below: call it from a Command. See [State and Events](../state-and-events) for the shared pattern.
+
+<ComponentExample
+  name="switch/controlled"
+  caption="Turn Wi-Fi off, or press Toggle. The console logs each change and its reason."
+/>
+
+## Form
+
+Pass `name` to include the switch in a native form, and render its `input` part. A switch that's on submits its `value`, which defaults to `"on"`; a switch that's off submits nothing. Reset returns it to `defaultChecked`. Pass `form` with a form's id to join it from elsewhere on the page.
+
+<ComponentExample
+  name="switch/form"
+  caption="Turn on Product updates and press Save. The console logs the submitted values, and Reset restores the defaults."
+/>
+
+## Validation
+
+`required` blocks submission until the switch is on. In a [Field](./field), the `error` part shows the message under the switch and connects it to the switch.
+
+<ComponentExample
+  name="switch/invalid"
+  caption="Press Continue with the switch off to see the error. Turn on Two-factor authentication and continue; the console logs the submitted value."
+/>
+
+## Saving on Toggle
+
+To save a change before it shows, keep `checked` in your Model and leave it as it is when `CheckedChange` arrives. Run a Command that saves, and change the Model when its result arrives.
+
+The example ignores changes while a save is running, and shows a spinner in the thumb. `aria-busy` tells assistive technology the switch is busy; `update` is what blocks another change.
+
+<ComponentExample
+  name="switch/async"
+  caption="Turn on Automatic backups. The thumb shows a spinner while it saves, then the switch turns on."
+/>
+
+## Custom Rendering
+
+Apply a part to any element's builder, and read its state with `state()`, like `parts.thumb.state().checked`. Keep the part on the element so its role, label and keyboard behavior stay connected. See [Rendering](../rendering) for more.
+
+<ComponentExample
+  name="switch/render"
+  caption="Turn on Dark mode. The thumb renders a sun or a moon from its state."
+/>
+
+## Styling
+
+Style the switch and its thumb with `data-checked` and `data-unchecked`, and use `data-disabled`, `data-readonly` and `data-required` for the rest. In an invalid field, the switch also gets `data-invalid` and `aria-invalid`; the thumb doesn't. Slide the thumb with `translate` on `data-checked`, and reverse it under `dir="rtl"`.
+
+Each part has a `data-slot`, such as `switch`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+## Data Attributes
+
+### root [#data-attributes-switch]
+
+<DataAttributes component="switch" part="root" />
+
+### thumb [#data-attributes-switchthumb]
+
+<DataAttributes component="switch" part="thumb" />
+
+## API Reference
+
+Props are the options below, without the callbacks, which are [events](#events).
+
+### Switch
+
+<TypeTable
+  path="../../packages/core/src/components/switch/switch.ts"
+  name="SwitchOptions"
+/>
+
+### State
+
+What `parts.state` holds, and what `state()` returns for the root. The thumb's state, `SwitchThumbState`, is the same.
+
+<StateTable
+  path="../../packages/core/src/components/switch/switch.ts"
+  name="SwitchState"
+/>
+
+### Reasons
+
+An event's `reason` says why the switch turned on or off.
+
+<ReasonTable
+  path="../../packages/core/src/components/switch/switch.ts"
+  name="SwitchCheckedChangeReason"
+/>
+
+### Controller
+
+Create one with `createSwitchController()` and pass it as `controller`.
+
+Every write method takes an optional `{ reason, event }`, sends the change event like a press, and returns `false` when the change does nothing.
+
+<ControllerTable
+  path="../../packages/core/src/components/switch/switch.ts"
+  name="SwitchController"
+/>
+
+### Events
+
+Each event carries plain data, for your messages and your tests.
+
+| Event           | Carries                                                                |
+| --------------- | ---------------------------------------------------------------------- |
+| `CheckedChange` | `{ value, reason, source }`: the new state, and the [reason](#reasons) |
+
+## Accessibility
+
+The switch follows the [WAI-ARIA switch pattern](https://www.w3.org/WAI/ARIA/apg/patterns/switch/). The root gives its button the `switch` role, and the `input` part is a hidden native checkbox that takes part in forms.
+
+### Keyboard
+
+| Key   | Does                                   |
+| ----- | -------------------------------------- |
+| Tab   | Moves to the next switch               |
+| Space | Turns it on or off                     |
+| Enter | Submits its form, and never toggles it |
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="switch" />
+
+In forms:
+
+<SpecList spec="forms.form" />
+
+Beyond the pattern's baseline:
+
+<SpecList spec="forms.enhancements" />
+
+Screen readers hear the same thing in each tested framework, recorded by a virtual screen reader:
+
+<SpecList spec="forms.sr" />

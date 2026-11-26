@@ -8,8 +8,16 @@ import * as Effect from "effect/Effect"
 
 type Root = Parameters<typeof BrowserHost.mountEffect>[0]
 
-const frame = () =>
-  new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+// Two tasks, so the first render's mounts have run. Not a frame: a spec that
+// pauses the clock pauses animation frames too.
+const task = () =>
+  new Promise((resolve) => {
+    const channel = new MessageChannel()
+    channel.port1.onmessage = () => resolve(undefined)
+    channel.port2.postMessage(undefined)
+  })
+
+const frame = () => task().then(task)
 
 function run(start: Effect.Effect<unknown, never, never>) {
   return new Promise<void>((resolve, reject) => {

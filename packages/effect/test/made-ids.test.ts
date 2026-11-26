@@ -55,3 +55,54 @@ test("an id prop left out is made once per part, the same on every render", asyn
   expect(ids[2]).toBe("mine")
   expect(second.html).toBe(first.html)
 })
+
+const list = definePrimitive({
+  name: "made-list",
+  state: () => ({}),
+  api: () => ({}),
+  slots: (slot) => ({
+    item: slot<{ value?: string }>({
+      props: { value: "id" },
+      attrs: (_state, { props }) => ({ "data-value": props.value }),
+    }),
+    title: slot<{ value?: string }>({
+      props: { value: { kind: "string", from: "item" } },
+      attrs: (_state, { props }) => ({ "data-item": props.value }),
+    }),
+  }),
+})
+
+const MadeList = createParts(list, {
+  name: "MadeList",
+  tags: { item: "li", title: "span" },
+})
+
+const ListPage = Html.component({
+  name: "ListPage",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    MadeList(h, {
+      view: (madeList) =>
+        h.ul.children(
+          ...["First", "Second"].map((text) => {
+            const item = madeList.in("item")
+            return item.item(h.li).children(item.title(h.span).children(text))
+          })
+        ),
+    }),
+})
+
+test("a part inside in() of its own slot takes the id in() made", async () => {
+  const { html } = await Effect.runPromise(
+    HtmlServer.renderToHtml(ListPage, {})
+  )
+  const values = [...html.matchAll(/ data-value="([^"]+)"/g)].map(([, v]) => v)
+  const items = [...html.matchAll(/ data-item="([^"]+)"/g)].map(([, v]) => v)
+  expect(values).toHaveLength(2)
+  expect(new Set(values).size).toBe(2)
+  expect(items).toEqual(values)
+})

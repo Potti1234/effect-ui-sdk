@@ -17,7 +17,6 @@ import {
   toggleFixture,
   type ToggleFixtureItem,
 } from "tests/fixtures/toggle.ts"
-import { createActions } from "../../ssr/effect-actions"
 import { mountFixture } from "../../ssr/effect-mount"
 
 const formatting = createToggleGroupController()
@@ -26,12 +25,16 @@ const formatting = createToggleGroupController()
 function createGate() {
   let settle: { resolve: () => void; reject: (reason: Error) => void } | null =
     null
-  return {
+  const gate = {
+    current: Promise.resolve(),
     wait: () =>
-      new Promise<void>((resolve, reject) => (settle = { resolve, reject })),
+      (gate.current = new Promise<void>(
+        (resolve, reject) => (settle = { resolve, reject })
+      )),
     resolve: () => settle?.resolve(),
     reject: () => settle?.reject(new Error("Offline")),
   }
+  return gate
 }
 
 const saving = createGate()
@@ -57,15 +60,13 @@ const FixtureMessage = UiSchema.TaggedEnum({
     action: Schema.String,
     source: Schema.optional(Schema.String),
   },
+  PressedPublish: {},
   SubmittedForm: {},
   ClickedClearFormatting: {},
   ClickedFinishSaving: {},
   ClickedFinishPublishing: {},
   ClickedFailPublishing: {},
 })
-
-const actions = createActions<typeof FixtureMessage.Type>()
-const { report } = actions
 
 const ClearFormatting = Command.make("ClearFormatting", { args: {} }, () =>
   Effect.sync(() => {
@@ -94,6 +95,16 @@ const Settle = Command.make(
     })
 )
 
+// Publishing reports "published" once the action's Promise resolves.
+const AwaitPublishing = Command.make("AwaitPublishing", { args: {} }, () =>
+  Effect.promise(() =>
+    publishing.current.then(
+      () => FixtureMessage.PressedButton({ action: "published" }),
+      () => Component.noop
+    )
+  )
+)
+
 const Fixture = Html.component({
   name: "ToggleFixture",
   props: FixtureProps,
@@ -117,7 +128,6 @@ const Fixture = Html.component({
       : toggleFixture.alignment.defaultValue,
     formatting: toggleFixture.formatting.defaultValue,
   }),
-  subscriptions: () => [actions.subscription],
   update: {
     RequestedPressedChange: ($, { pressed }) =>
       $.props.cancel === toggleFixture.toggle.value
@@ -139,6 +149,8 @@ const Fixture = Html.component({
         action,
         ...(source === undefined ? {} : { pressedWith: source }),
       }),
+    PressedPublish: ($) =>
+      $.evolve({ action: "publishing" }).run(AwaitPublishing.make({})),
     SubmittedForm: ($) => $.evolve({ submissions: (count) => count + 1 }),
     ClickedClearFormatting: ($) => $.run(ClearFormatting.make({})),
     ClickedFinishSaving: ($) =>
@@ -246,11 +258,8 @@ const Fixture = Html.component({
           }),
           Button(h, {
             key: "delete",
-            props: {
-              disabled: true,
-              action: () =>
-                report(FixtureMessage.PressedButton({ action: "delete" })),
-            },
+            props: { disabled: true },
+            onEmit: () => FixtureMessage.PressedButton({ action: "delete" }),
             view: (button) =>
               button.root(h.button.class("button")).children("Delete"),
           }),
@@ -260,31 +269,23 @@ const Fixture = Html.component({
               type: "submit",
               disabled: true,
               focusableWhenDisabled: true,
-              action: () =>
-                report(FixtureMessage.PressedButton({ action: "archive" })),
             },
+            onEmit: () => FixtureMessage.PressedButton({ action: "archive" }),
             view: (button) =>
               button.root(h.button.class("button")).children("Archive"),
           })
         ),
       Button(h, {
         key: "save",
-        props: {
-          action: (_event: unknown, { source }: { source: string }) =>
-            report(FixtureMessage.PressedButton({ action: "save", source })),
-        },
+        onEmit: ({ source }) =>
+          FixtureMessage.PressedButton({ action: "save", source }),
         view: (button) =>
           button.root(h.button.class("button")).children("Save"),
       }),
       Button(h, {
         key: "publish",
-        props: {
-          action: async () => {
-            report(FixtureMessage.PressedButton({ action: "publishing" }))
-            await publishing.wait()
-            report(FixtureMessage.PressedButton({ action: "published" }))
-          },
-        },
+        props: { action: publishing.wait },
+        onEmit: () => FixtureMessage.PressedPublish(),
         view: (button) =>
           button.root(h.button.class("button")).children("Publish"),
       }),

@@ -71,6 +71,9 @@ class Handle {
   // What the last render read of the instance, read again on every change.
   reads: { value: unknown; again: () => unknown }[] = []
   emit: ((call: Call) => void) | undefined
+  // The bound part elements, and the messages waiting for one to deliver them.
+  nodes = new Set<HTMLElement>()
+  pending: PrimitiveMessage[] = []
 }
 
 const isHandle = (value: unknown): value is Handle => value instanceof Handle
@@ -140,7 +143,10 @@ const propSchemas: Record<string, Schema.Top> = {
 const kindOf = (spec: unknown) =>
   typeof spec === "string" ? spec : (spec as { kind: string }).kind
 
-const isCallback = (spec: unknown) => kindOf(spec) === "callback"
+const isAction = (spec: unknown) => kindOf(spec) === "action"
+
+const isCallback = (spec: unknown) =>
+  kindOf(spec) === "callback" || isAction(spec)
 
 // Where a prop comes from when its part leaves it out: the slot around it,
 // and that slot's prop, which `"group.id"` names and `"item"` leaves to
@@ -161,7 +167,12 @@ const required = (spec: unknown) =>
 // The props of the parts around the ones rendering, by slot.
 type Around = Record<string, Record<string, unknown>>
 
-const eventName = (option: string) => option.slice(2)
+// `onOpenChange` is `OpenChange`, and an action without `on`, like a
+// button's `action`, is `Action`.
+const eventName = (option: string) =>
+  /^on[A-Z]/.test(option)
+    ? option.slice(2)
+    : option.replace(/^./, (first) => first.toUpperCase())
 
 const camel = (slot: string) =>
   slot.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
@@ -192,6 +203,7 @@ const BindPart = Mount.makeStream(
             return
           }
           const unbindPart = bind(part, node, host)
+          next.handle.nodes.add(node)
           listenForFocus(node)
           const write = () => writeChanged(next.handle, next.part, part, node)
           writers.set(node, write)
@@ -199,9 +211,12 @@ const BindPart = Mount.makeStream(
             if (justFocused === node) {
               write()
             }
+            hideWhileAbsent(part, node)
           })
+          hideWhileAbsent(part, node)
           unbind = () => {
             unsubscribe()
+            next.handle.nodes.delete(node)
             if (writers.get(node) === write) {
               writers.delete(node)
             }
@@ -257,6 +272,21 @@ function listenForFocus(el: HTMLElement) {
   )
 }
 
+// A part that leaves the page, like an avatar's fallback once a cached image
+// binds, is hidden at once, so no frame shows it before the render removes it.
+const hidden = new WeakMap<HTMLElement, string>()
+
+function hideWhileAbsent(part: Part, el: HTMLElement) {
+  const absent = !isPresent(part)
+  if (absent && !hidden.has(el)) {
+    hidden.set(el, el.style.display)
+    el.style.display = "none"
+  } else if (!absent && hidden.has(el)) {
+    el.style.display = hidden.get(el)!
+    hidden.delete(el)
+  }
+}
+
 function writeChanged(
   handle: Handle,
   key: string,
@@ -285,6 +315,29 @@ function writeChanged(
   rendered.attrs = next
 }
 
+// A Subscription's message reaches `update` a task later, after a spec or a
+// screen reader has read the page and a frame has painted. A message goes out
+// through a part element's own handler instead: inside the DOM event that
+// made the change, or a microtask after a change made anywhere else.
+const deliverEvent = "ui-sdk-message"
+
+function deliver(handle: Handle, message: PrimitiveMessage) {
+  for (const node of handle.nodes) {
+    if (!node.isConnected) {
+      continue
+    }
+    handle.pending.push(message)
+    node.dispatchEvent(new CustomEvent(deliverEvent))
+    const left = handle.pending.indexOf(message)
+    if (left === -1) {
+      return true
+    }
+    handle.pending.splice(left, 1)
+    return false
+  }
+  return false
+}
+
 // Keeps the instance for as long as the component lives, reports every
 // change that affects rendering, and relays the instance's callbacks. A
 // Subscription, so a primitive without a root element, like a popover's,
@@ -307,14 +360,24 @@ const keepInstance = (handle: Handle) =>
         )
         if (next !== version || read) {
           version = next
-          Queue.offerUnsafe(
-            queue,
-            PrimitiveMessage.ChangedState({ version: ++renders })
-          )
+          send(PrimitiveMessage.ChangedState({ version: ++renders }))
         }
       }
-      handle.emit = (call) =>
-        Queue.offerUnsafe(queue, PrimitiveMessage.CalledCallback(call))
+      const send = (message: PrimitiveMessage) => {
+        const later = () => {
+          if (!deliver(handle, message)) {
+            Queue.offerUnsafe(queue, message)
+          }
+        }
+        if (!globalThis.window) {
+          Queue.offerUnsafe(queue, message)
+        } else if (window.event) {
+          later()
+        } else {
+          queueMicrotask(later)
+        }
+      }
+      handle.emit = (call) => send(PrimitiveMessage.CalledCallback(call))
       keep(instance)
       const unsubscribe = instance.subscribe(changed)
       changed()
@@ -333,25 +396,29 @@ const keepInstance = (handle: Handle) =>
 
 // Callbacks the instance calls, which the root relays as messages once it's
 // in the page. Their details become plain data: what changed, why and how.
-function callbacksOf(handle: Handle, names: string[]) {
+function callbacksOf(handle: Handle, names: string[], actions: string[]) {
   return (handle.callbacks ??= Object.fromEntries(
     names.map((name) => [
       name,
-      first(() => handle.given?.[name], relay(handle, eventName(name))),
+      first(
+        () => handle.given?.[name],
+        relay(handle, eventName(name), undefined, actions.includes(name))
+      ),
     ])
   ))
 }
 
 // A callback the consumer passes runs first, synchronously, for what can't
-// wait for a message, like `details.cancel()`. Then the event goes out.
+// wait for a message, like `details.cancel()`, and an action's Promise keeps
+// its part pending. Then the event goes out.
 const first =
   (own: () => unknown, then: (...args: any[]) => void) =>
   (...args: unknown[]) => {
     const callback = own()
-    if (typeof callback === "function") {
-      callback(...args)
-    }
+    const result =
+      typeof callback === "function" ? callback(...args) : undefined
     then(...args)
+    return result
   }
 
 const isFunction = (value: unknown): value is (...args: any[]) => unknown =>
@@ -360,10 +427,18 @@ const isFunction = (value: unknown): value is (...args: any[]) => unknown =>
 // A callback that relays its call as the event `tag`, with the key of the
 // part it belongs to, like an accordion item's.
 const relay =
-  (handle: Handle, tag: string, key?: string) =>
-  (first: unknown, second?: Details) => {
+  (handle: Handle, tag: string, key?: string, action = false) =>
+  (...args: unknown[]) => {
+    // An action, like a button's, gets the DOM event first, which a message
+    // can't carry.
+    const given = action ? args.filter((arg) => !isEvent(arg)) : args
+    if (action && given.length > 1 && given[0] === undefined) {
+      given.shift()
+    }
+    const [first, second] = given as [unknown, Details | undefined]
     // A callback that takes only the details, like `onDismissAttempt`, has no value.
-    const alone = second === undefined && isDetails(first)
+    const alone =
+      second === undefined && (isDetails(first) || (action && isSourced(first)))
     const value = alone ? undefined : first
     const details = alone ? first : second
     handle.emit?.({
@@ -379,6 +454,14 @@ const isDetails = (value: unknown): value is Details =>
   typeof value === "object" &&
   value !== null &&
   typeof (value as { reason?: unknown }).reason === "string"
+
+const isSourced = (value: unknown): value is Details =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { source?: unknown }).source === "string"
+
+const isEvent = (value: unknown) =>
+  typeof Event !== "undefined" && value instanceof Event
 
 // The event a slot's callback prop is, like an item's `onOpenChange`: `ItemOpenChange`.
 const slotEventName = (slot: string, prop: string) =>
@@ -490,6 +573,7 @@ function createParts<
   const callbacks = optionNames.filter((name) =>
     isCallback(schema.options[name])
   )
+  const actions = optionNames.filter((name) => isAction(schema.options[name]))
   const fields: Schema.Struct.Fields = Object.fromEntries([
     ["id", Schema.optional(Schema.String)],
     ...optionNames.map((name) => [
@@ -556,7 +640,7 @@ function createParts<
     handle.given = given
     const next: Record<string, unknown> = {
       ...given,
-      ...callbacksOf(handle, callbacks),
+      ...callbacksOf(handle, callbacks, actions),
       id: given.id ?? id,
     }
     if (!handle.instance) {
@@ -607,6 +691,7 @@ function createParts<
             const mapKey = `${slot}:${part.key}`
             handle.parts.set(mapKey, part)
             return builder
+              .on(deliverEvent, () => handle.pending.shift())
               .onMount(BindPart({ handle, part: mapKey }))
               .forward((node: any) => {
                 const author = node.elementAttrs as Record<string, string>
@@ -620,7 +705,18 @@ function createParts<
                   merge(partAttrs(part, slotProps), author)
                 )
                 handle.rendered.set(mapKey, { attrs, author })
-                return filled.attrs(attrs)
+                // Effect UI's listener runs before core's, which would refuse
+                // the press, so a disabled part drops the consumer's click.
+                const refused =
+                  attrs["aria-disabled"] === "true" &&
+                  node.handlers?.click !== undefined
+                return (
+                  refused
+                    ? filled.on("click", () => undefined, {
+                        preventDefault: "always",
+                      })
+                    : filled
+                ).attrs(attrs)
               })
           }
         )
@@ -645,6 +741,12 @@ function createParts<
           }
           const spec = specs[key]
           if (kindOf(spec) === "id") {
+            // Inside `in(slot)`, the slot's own part is the one `in` made the id for.
+            const enclosing = around[slot]?.[key]
+            if (enclosing !== undefined) {
+              resolved[key] = enclosing
+              continue
+            }
             const index = (counts[`${slot}.${key}`] ??= 0)
             if (rendering) {
               counts[`${slot}.${key}`]++
@@ -679,7 +781,7 @@ function createParts<
           }
           resolved[prop] = handle.slotCallbacks[id] ??= first(
             () => handle.slotGiven[id],
-            relay(handle, tag, key)
+            relay(handle, tag, key, isAction(slotSchemas[slot][prop]))
           )
         }
         const listKey = keyProps[slot]
@@ -781,7 +883,7 @@ type CamelCase<S extends string> = S extends `${infer H}-${infer T}`
   : S
 
 type CallbackKeys<O> = {
-  [K in keyof O & string]-?: K extends `on${string}`
+  [K in keyof O & string]-?: K extends `on${string}` | "action"
     ? NonNullable<O[K]> extends (...args: any[]) => any
       ? K
       : never
@@ -818,27 +920,43 @@ type Loosen<T> = T extends (infer Item)[] ? readonly Item[] | T : T
  */
 type EffectEvents<P extends Primitive, Tags = {}> =
   | {
-      [K in CallbackKeys<OptionsOf<P>>]: K extends `on${infer Name}`
-        ? { readonly _tag: Name } & Payload<Callback<P, K>>
-        : never
+      [K in CallbackKeys<OptionsOf<P>>]: {
+        readonly _tag: EventName<K>
+      } & Payload<Callback<P, K>>
     }[CallbackKeys<OptionsOf<P>>]
   | SlotEvents<P, Tags>
 
+type EventName<K extends string> = K extends `on${infer Name}`
+  ? Name
+  : Capitalize<K>
+
+// An action, like a button's, gets the DOM event first, which its event leaves out.
+type WithoutEvent<A extends readonly unknown[]> = A extends readonly [
+  infer First,
+  ...infer Rest,
+]
+  ? [First] extends [Event | undefined]
+    ? Rest
+    : A
+  : A
+
 // What a callback's event carries: its value, and the reason and source of
 // its details, which a callback like `onDismissAttempt` takes alone.
-type Payload<A extends readonly unknown[]> = A extends readonly [
-  { reason: string },
-]
-  ? {
-      readonly value?: undefined
-      readonly reason?: ReasonOf<A[0]>
-      readonly source?: string
-    }
-  : {
-      readonly value: A[0]
-      readonly reason?: ReasonOf<A[1]>
-      readonly source?: string
-    }
+type Payload<A extends readonly unknown[]> = DetailsPayload<WithoutEvent<A>>
+
+type DetailsPayload<A extends readonly unknown[]> = A extends readonly []
+  ? { readonly value?: undefined; readonly source?: string }
+  : A extends readonly [{ reason: string } | { source: string }]
+    ? {
+        readonly value?: undefined
+        readonly reason?: ReasonOf<A[0]>
+        readonly source?: string
+      }
+    : {
+        readonly value: A[0]
+        readonly reason?: ReasonOf<A[1]>
+        readonly source?: string
+      }
 
 type ReasonOf<Details> = Details extends { reason: infer R } | undefined
   ? R
@@ -855,12 +973,10 @@ type SlotCallback<P extends Primitive, S extends SlotName<P>, K> =
 // `onOpenChange`, which is `ItemOpenChange` with the item's key.
 type SlotEvents<P extends Primitive, Tags> = {
   [S in keyof Tags & SlotName<P>]: {
-    [K in CallbackKeys<PropsOf<P, S>>]: K extends `on${infer Name}`
-      ? {
-          readonly _tag: `${Capitalize<CamelCase<S>>}${Name}`
-          readonly key?: string
-        } & Payload<SlotCallback<P, S, K>>
-      : never
+    [K in CallbackKeys<PropsOf<P, S>>]: {
+      readonly _tag: `${Capitalize<CamelCase<S>>}${EventName<K>}`
+      readonly key?: string
+    } & Payload<SlotCallback<P, S, K>>
   }[CallbackKeys<PropsOf<P, S>>]
 }[keyof Tags & SlotName<P>]
 

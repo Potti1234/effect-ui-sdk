@@ -4,14 +4,11 @@ import { Button } from "@ui-sdk/effect/button"
 import { Separator } from "@ui-sdk/effect/separator"
 import { Toggle, ToggleGroup } from "@ui-sdk/effect/toggle"
 import * as Schema from "effect/Schema"
-import { createActions } from "../../ssr/effect-actions"
 import { mountFixture } from "../../ssr/effect-mount"
 
 const FixtureMessage = UiSchema.TaggedEnum({
   Acted: { action: Schema.String },
 })
-
-const actions = createActions<typeof FixtureMessage.Type>()
 
 const Fixture = Html.component({
   name: "ToggleRenderFixture",
@@ -19,7 +16,6 @@ const Fixture = Html.component({
   message: FixtureMessage,
 }).make({
   init: () => ({ action: "" }),
-  subscriptions: () => [actions.subscription],
   update: {
     Acted: ($, { action }) => $.evolve({ action }),
   },
@@ -28,10 +24,7 @@ const Fixture = Html.component({
       h.button.children("Before"),
       Button(h, {
         key: "span",
-        props: {
-          action: () =>
-            actions.report(FixtureMessage.Acted({ action: "span" })),
-        },
+        onEmit: () => FixtureMessage.Acted({ action: "span" }),
         view: (button) =>
           button.root(h.span.class("button")).children("Span button"),
       }),

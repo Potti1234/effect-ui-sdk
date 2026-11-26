@@ -49,7 +49,8 @@
     "./separator": "./src/separator.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
-    "./text-match": "./src/text-match.ts"
+    "./text-match": "./src/text-match.ts",
+    "./toggle": "./src/toggle.ts"
   },
   "sideEffects": false,
   "files": [
@@ -145,6 +146,10 @@
       "./text-match": {
         "types": "./dist/text-match.d.ts",
         "default": "./dist/text-match.js"
+      },
+      "./toggle": {
+        "types": "./dist/toggle.d.ts",
+        "default": "./dist/toggle.js"
       }
     }
   },

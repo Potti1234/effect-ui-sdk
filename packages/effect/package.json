@@ -39,6 +39,7 @@
     "./gesture": "./src/gesture.ts",
     "./history": "./src/history.ts",
     "./image": "./src/image.ts",
+    "./label": "./src/label.ts",
     "./number": "./src/number.ts",
     "./observe": "./src/observe.ts",
     "./popover": "./src/popover.ts",
@@ -101,6 +102,10 @@
       "./image": {
         "types": "./dist/image.d.ts",
         "default": "./dist/image.js"
+      },
+      "./label": {
+        "types": "./dist/label.d.ts",
+        "default": "./dist/label.js"
       },
       "./number": {
         "types": "./dist/number.d.ts",

@@ -45,6 +45,7 @@
     "./popover": "./src/popover.ts",
     "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
+    "./progress": "./src/progress.ts",
     "./radio": "./src/radio.ts",
     "./separator": "./src/separator.ts",
     "./shortcuts": "./src/shortcuts.ts",
@@ -126,6 +127,10 @@
       "./primitive": {
         "types": "./dist/primitive.d.ts",
         "default": "./dist/primitive.js"
+      },
+      "./progress": {
+        "types": "./dist/progress.d.ts",
+        "default": "./dist/progress.js"
       },
       "./radio": {
         "types": "./dist/radio.d.ts",

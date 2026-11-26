@@ -257,6 +257,26 @@ Every change the rating makes goes through `change`, which calls `onValueChange`
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+Effect UI has no `cancel()`: a change reaches your `update` after the rating asked for it. Keep the value in your Model, and leave it as it is while you save:
+
+```ts
+Rating(h, {
+  props: { value: model.rating },
+  onEmit: {
+    ValueChange: ({ value }) => Message.RequestedValueChangeRating({ value }),
+  },
+  view: (rating) =>
+    rating.root(h.div.attr("aria-label", "Rating")).children(stars),
+})
+
+// In update:
+RequestedValueChangeRating: ($, { value }) =>
+  $.model.saving ? $.model : $.evolve({ rating: value }),
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```ts
@@ -344,6 +364,25 @@ function onKeydown(event: KeyboardEvent) {
   }}
 />
 ```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+rating.star(
+  h.button.on(
+    "keydown",
+    ({ key }) =>
+      key === "ArrowUp" || key === "ArrowDown"
+        ? Message.PressedRowKey({ key })
+        : undefined,
+    { preventDefault: true }
+  ),
+  { value: "3" }
+)
+```
+
+`{ preventDefault: true }` cancels the key only when the handler returns a message, so the star still handles every other key.
 
 </FrameworkContent>
 <FrameworkContent value="web-components">

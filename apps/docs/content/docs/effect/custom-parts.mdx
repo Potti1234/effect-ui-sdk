@@ -1,0 +1,68 @@
+---
+title: Custom Parts
+description: Add your own logic to a part, attach a behavior to an element, and call a primitive's api.
+---
+
+The parts from [Rendering Primitives](./rendering) are enough until one needs logic of its own. In Effect UI, a part decorates your builder, so the logic stays on your builder: a handler, a behavior attached to the element, or a control that calls the primitive. You keep the same `rating.ts` from [Compose Behaviors](../core/compose-behaviors#complete-primitive).
+
+## Handle an Event First
+
+A handler on your builder runs before the part's own. With `{ preventDefault: true }`, it cancels the event when it returns a message, and the part skips its own handling of that event:
+
+```ts
+rating.star(
+  h.button.on(
+    "keydown",
+    ({ key }) =>
+      key === "ArrowUp" || key === "ArrowDown"
+        ? Message.PressedRowKey({ key })
+        : undefined,
+    { preventDefault: true }
+  ),
+  { value: "3" }
+)
+```
+
+Up and Down reach your `update` as `PressedRowKey`, and every other key still moves the rating.
+
+## Attach a Behavior
+
+Core's element behaviors, like `bindHold`, `bindRepeat` or `bindScrollPicker`, take the element they work on and return what stops them. `attach` runs one on an element while it's in the page, and stops it when the element leaves:
+
+```ts
+import { bindScrollPicker } from "@ui-sdk/core"
+import { attach } from "@ui-sdk/effect/primitive"
+
+h.div.onMount(
+  attach<Message>((el, send) =>
+    bindScrollPicker(el, {
+      onSelect: (index) => send(Message.PickedHour({ hour: hours[index] })),
+    })
+  )
+)
+```
+
+`send` turns a behavior's callback into your message, so it reaches `update` like any other. Pass the values a behavior depends on as the second argument, and `attach` runs it again when they change. It works on a part's element too, beside the part's own behavior.
+
+## Call the Primitive
+
+A control of yours that starts the primitive's own work is one of its parts too. `calls` has a part for each api method, and pressing the control calls it:
+
+```ts
+Rating(h, {
+  onEmit: {
+    ValueChange: ({ value }) => Message.RequestedValueChangeRating({ value }),
+  },
+  view: (rating) =>
+    h.div.children(
+      rating.calls.rate(h.button, 3).children("Set to 3"),
+      rating.calls.rate(h.button, 0).children("Reset")
+    ),
+})
+```
+
+The call runs as a Command, `CallApi`, so the message log shows which control called what. The change it makes still reaches `update` as an event.
+
+## Build on Another Component
+
+A headless component of your own can build on one from `createParts` with `p.child`, and add its own parts and state beside it. See Effect UI's [headless composition](https://ui.effect.website) guide.

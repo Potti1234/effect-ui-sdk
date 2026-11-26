@@ -1,0 +1,136 @@
+---
+title: Rendering Primitives
+description: Turn a Core primitive into an Effect UI headless component with createParts.
+---
+
+This page renders the rating from [Compose Behaviors](../core/compose-behaviors). Start with that guide's [complete `rating.ts`](../core/compose-behaviors#complete-primitive): it already handles selection, arrow keys, and focus. Here we'll connect its `root` and `star` slots to Effect UI.
+
+## Create the Parts
+
+`createParts` maps slots to elements and makes one headless component. Save this beside `rating.ts`:
+
+```ts title="rating-parts.ts"
+import { createParts } from "@ui-sdk/effect/primitive"
+import { rating } from "./rating"
+
+const Rating = createParts(rating, {
+  name: "Rating",
+  tags: { root: "div", star: "button" },
+})
+
+export { Rating }
+```
+
+`name` is the component's name in Effect UI's log and DevTools. Each slot in `tags` becomes a part of the `view` closure, in camel case: `star` is `star`, and `tab-icon` would be `tabIcon`.
+
+The component makes the primitive's instance when it first renders and keeps it for as long as it lives, so a primitive without a root element, like a popover's, works the same way.
+
+## Render the Rating
+
+Call the component in a view. Its props are the primitive's options, and each part decorates a builder of yours. A part that takes props, like a star's `value`, takes them as its second argument:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import * as Schema from "effect/Schema"
+import { Rating } from "./rating-parts"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Rating(h, {
+      props: { defaultValue: 4 },
+      view: (rating) =>
+        rating
+          .root(h.div.attr("aria-label", "Rating").class("flex gap-1"))
+          .children(
+            [1, 2, 3, 4, 5].map((star) =>
+              rating
+                .star(
+                  h.button
+                    .key(String(star))
+                    .attr(
+                      "aria-label",
+                      `${star} ${star === 1 ? "star" : "stars"}`
+                    )
+                    .class("opacity-40 data-filled:opacity-100"),
+                  { value: String(star) }
+                )
+                .children("★")
+            )
+          ),
+    }),
+})
+
+export { Example }
+```
+
+The primitive supplies `data-filled`; these classes make the filled stars easier to see.
+
+A part keeps what you give its element: an `id` or a label you set wins over the part's own, classes combine, and styles combine with the part's properties winning. Everything the behavior reads, like `role` and `aria-checked`, stays the part's.
+
+## Keep the Value in Your Model
+
+A callback option is an event named without `on`, so the rating's `onValueChange` is `ValueChange`, with the `value`, the `reason` and the `source` of the change. Pass `value` and decide each change in `update`:
+
+```ts
+Rating(h, {
+  props: { value: model.rating },
+  onEmit: {
+    ValueChange: ({ value }) => Message.RequestedValueChangeRating({ value }),
+  },
+  view: (rating) => rating.root(h.div).children(stars),
+})
+```
+
+Leaving the Model as it is refuses the change. See [State and Events](./state-and-events).
+
+## Read the State
+
+`rating.state` is the root's state. Every part reads its own with `state()`, for the props it would take:
+
+```ts
+rating.star.state({ value: "3" })
+```
+
+## Parts Inside Parts
+
+Some parts take what they need from the part around them, like an accordion item's trigger and panel, which take the item's `value`. `in(slot, props)` gives the parts inside one of them:
+
+```ts
+accordion.root(h.div).children(
+  sections.map((section) => {
+    const item = accordion.in("item", { value: section.value })
+    return accordion
+      .item(h.div.key(section.value), { value: section.value })
+      .children(
+        item
+          .header(h.h3)
+          .children(item.trigger(h.button).children(section.title)),
+        item.panel(h.div.children(section.body))
+      )
+  })
+)
+```
+
+## Parts That Leave the Page
+
+A slot can decide whether its element is in the page, like a closed panel. List those slots in `present`, and their parts return `undefined` while the element shouldn't be there:
+
+```ts
+const Collapsible = createParts(collapsible, {
+  name: "Collapsible",
+  tags: { root: "div", trigger: "button", panel: "div" },
+  present: ["panel"],
+})
+```
+
+Give such a part its children before you apply it: `collapsible.panel(h.div.children(...))`. `createParts` throws when the list doesn't match the primitive, so the types and the page agree.
+
+## Add Logic to a Part
+
+Keep `createParts` when mapping slots to elements is enough. [Custom Parts](./custom-parts) shows how to handle a part's events first, attach a behavior to its element, and call the primitive's api from a control of yours.

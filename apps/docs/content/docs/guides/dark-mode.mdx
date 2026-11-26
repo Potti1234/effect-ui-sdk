@@ -47,6 +47,13 @@ npm add @ui-sdk/core @ui-sdk/solid
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```bash
+npm add @ui-sdk/core @ui-sdk/effect
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```bash
@@ -142,6 +149,30 @@ function App() {
     </Preferences>
   )
 }
+
+export { App }
+```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="src/app.ts"
+import * as Html from "@effect/ui/html/Html"
+import { Preferences } from "@ui-sdk/effect/preferences"
+import * as Schema from "effect/Schema"
+import { colorScheme } from "@/lib/color-scheme"
+import { Home } from "@/pages/home"
+
+const App = Html.component({
+  name: "App",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Preferences(h, { preferences: [colorScheme] }).children(Home(h, {})),
+})
 
 export { App }
 ```

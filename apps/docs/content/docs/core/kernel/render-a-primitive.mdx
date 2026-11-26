@@ -37,6 +37,13 @@ npm add @ui-sdk/solid
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```bash
+npm add @ui-sdk/effect
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```bash
@@ -99,6 +106,23 @@ export { CopyButton }
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="copy-button-parts.ts"
+import { createParts } from "@ui-sdk/effect/primitive"
+import { copyButton } from "./copy-button"
+
+const CopyButton = createParts(copyButton, {
+  name: "CopyButton",
+  tags: { root: "button" },
+})
+
+export { CopyButton }
+```
+
+`createParts` makes an Effect UI headless component. Its `view` gets a part for each slot you map, named in camel case, so a `tab-icon` slot is `tabIcon`. List the slots whose element can leave the page, like a panel, in `present`.
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```ts title="copy-button-parts.ts"
@@ -159,6 +183,21 @@ A callback option becomes an event, so `onCopy` is `@copy`.
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+CopyButton(h, {
+  props: { text: "npm add @ui-sdk/core" },
+  onEmit: {
+    Copy: ({ value }) => Message.CopiedCommand({ text: value }),
+  },
+  view: (copyButton) => copyButton.root(h.button).children("Copy"),
+})
+```
+
+The options are the component's props. A callback option becomes an event named without `on`, so `onCopy` is `Copy`, and `onEmit` maps it to your message.
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```html
@@ -209,6 +248,21 @@ The root's slot returns `copied` from its `state`, so the button's content can f
   {(state) => (state.copied ? "Copied" : "Copy")}
 </CopyButton>
 ```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+CopyButton(h, {
+  props: { text: "npm add @ui-sdk/core" },
+  view: (copyButton) =>
+    copyButton
+      .root(h.button)
+      .children(copyButton.state.copied ? "Copied" : "Copy"),
+})
+```
+
+`copyButton.state` is the root's state, and every part reads its own with `state()`, like `rating.star.state({ value: "3" })`.
 
 </FrameworkContent>
 <FrameworkContent value="web-components">

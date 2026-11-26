@@ -6,6 +6,7 @@ import type {
   PropsOf,
   SlotName,
   StateOf,
+  TypesOf,
 } from "@ui-sdk/core"
 import {
   attrs as partAttrs,
@@ -20,9 +21,11 @@ import {
   unwatched,
   yieldToAuthor,
 } from "@ui-sdk/core/renderer"
-import type * as Component from "@effect/ui/Component"
+import * as Command from "@effect/ui/Command"
+import * as Component from "@effect/ui/Component"
 import * as Html from "@effect/ui/html/Html"
 import * as Mount from "@effect/ui/Mount"
+import * as Subscription from "@effect/ui/Subscription"
 import * as UiSchema from "@effect/ui/UiSchema"
 import * as View from "@effect/ui/View"
 import * as Effect from "effect/Effect"
@@ -82,7 +85,28 @@ const PrimitiveMessage = UiSchema.TaggedEnum({
     reason: Schema.optional(Schema.String),
     source: Schema.optional(Schema.String),
   },
+  PressedCall: { method: Schema.String, args: Schema.Array(Schema.Unknown) },
 })
+
+// Runs an api method a consumer's control asked for, like a rating's
+// `rate(3)` from a button outside it, as a Command, so the log names it.
+const CallApi = Command.make(
+  "CallApi",
+  {
+    args: {
+      handle: Schema.declare(isHandle),
+      method: Schema.String,
+      args: Schema.Array(Schema.Unknown),
+    },
+  },
+  ({ handle, method, args }) =>
+    Effect.sync(() => {
+      const api = handle.instance?.api as
+        Record<string, (...args: unknown[]) => unknown> | undefined
+      api?.[method]?.(...args)
+      return Component.noop
+    })
+)
 
 type PrimitiveMessage = typeof PrimitiveMessage.Type
 
@@ -99,6 +123,25 @@ const kindOf = (spec: unknown) =>
   typeof spec === "string" ? spec : (spec as { kind: string }).kind
 
 const isCallback = (spec: unknown) => kindOf(spec) === "callback"
+
+// Where a prop comes from when its part leaves it out: the slot around it,
+// and that slot's prop, which `"group.id"` names and `"item"` leaves to
+// the prop's own name.
+function fromOf(spec: unknown, key: string) {
+  if (typeof spec !== "object" || spec === null || !("from" in spec)) {
+    return undefined
+  }
+  const [slot, prop = key] = String(spec.from).split(".")
+  return { slot, prop }
+}
+
+const required = (spec: unknown) =>
+  typeof spec === "object" && spec !== null && "required" in spec
+    ? Boolean(spec.required)
+    : false
+
+// The props of the parts around the ones rendering, by slot.
+type Around = Record<string, Record<string, unknown>>
 
 const eventName = (option: string) => option.slice(2)
 
@@ -117,17 +160,26 @@ const BindPart = Mount.makeStream(
       Effect.fnUntraced(function* () {
         let unbind = () => {}
         let bound: Part | undefined
-        const follow = ({ handle, part }: typeof args) => {
-          const next = handle.parts.get(part)
-          if (next === bound) {
+        let current = args
+        const follow = (next: typeof args) => {
+          current = next
+          const part = next.handle.parts.get(next.part)
+          if (part === bound) {
             return
           }
           unbind()
-          bound = next
-          unbind = next ? bind(next, node, host) : () => {}
+          bound = part
+          unbind = part ? bind(part, node, host) : () => {}
         }
         follow(args)
-        yield* Effect.addFinalizer(() => Effect.sync(() => unbind()))
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            unbind()
+            if (current.handle.parts.get(current.part) === bound) {
+              current.handle.parts.delete(current.part)
+            }
+          })
+        )
         yield* Stream.runForEach(changes, (next) =>
           Effect.sync(() => follow(next))
         ).pipe(Effect.forkScoped)
@@ -135,44 +187,42 @@ const BindPart = Mount.makeStream(
     )
 )
 
-// The root keeps the instance while its element is in the page, reports
-// every change that affects rendering, and relays the instance's callbacks.
-const KeepInstance = Mount.makeStream(
-  "KeepInstance",
-  { args: { handle: HandleArg, part: Schema.String } },
-  (node: HTMLElement, { handle, part }) =>
-    Stream.callback<PrimitiveMessage>(
-      Effect.fnUntraced(function* (queue) {
-        const instance = handle.instance!
-        const root = handle.parts.get(part)!
-        let version = renderVersion(instance)
-        const changed = () => {
-          const next = renderVersion(instance)
-          if (next !== version) {
-            version = next
-            Queue.offerUnsafe(queue, PrimitiveMessage.ChangedState({ version }))
-          }
+// Keeps the instance for as long as the component lives, reports every
+// change that affects rendering, and relays the instance's callbacks. A
+// Subscription, so a primitive without a root element, like a popover's,
+// keeps its instance too, and a kept-alive component keeps its state.
+const keepInstance = (handle: Handle) =>
+  Stream.callback<PrimitiveMessage>(
+    Effect.fnUntraced(function* (queue) {
+      const instance = handle.instance
+      if (!instance) {
+        return
+      }
+      let version = renderVersion(instance)
+      const changed = () => {
+        const next = renderVersion(instance)
+        if (next !== version) {
+          version = next
+          Queue.offerUnsafe(queue, PrimitiveMessage.ChangedState({ version }))
         }
-        handle.emit = (call) =>
-          Queue.offerUnsafe(queue, PrimitiveMessage.CalledCallback(call))
-        keep(instance)
-        const unsubscribe = instance.subscribe(changed)
-        const unbind = bind(root, node, host)
-        changed()
-        yield* Effect.addFinalizer(() =>
-          Effect.sync(() => {
-            unbind()
-            unsubscribe()
-            handle.emit = undefined
-            release(instance)
-            instance.destroy()
-            handle.instance = undefined
-            handle.parts.clear()
-          })
-        )
-      })
-    )
-)
+      }
+      handle.emit = (call) =>
+        Queue.offerUnsafe(queue, PrimitiveMessage.CalledCallback(call))
+      keep(instance)
+      const unsubscribe = instance.subscribe(changed)
+      changed()
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          unsubscribe()
+          handle.emit = undefined
+          release(instance)
+          instance.destroy()
+          handle.instance = undefined
+          handle.parts.clear()
+        })
+      )
+    })
+  )
 
 // Callbacks the instance calls, which the root relays as messages once it's
 // in the page. Their details become plain data: what changed, why and how.
@@ -266,7 +316,17 @@ function createParts<
 ) {
   const schema = schemaOf(primitive) as {
     options: Record<string, unknown>
+    slots: Record<string, Record<string, unknown>>
   }
+  const slotSchemas = schema.slots
+  const keyProps = Object.fromEntries(
+    Object.entries(slotSchemas).flatMap(([slot, specs]) => {
+      const key = Object.keys(specs).find(
+        (name) => kindOf(specs[name]) === "key"
+      )
+      return key ? [[slot, key]] : []
+    })
+  )
   const optionNames = Object.keys(schema.options).filter(
     (name) => name !== "debug"
   )
@@ -343,44 +403,135 @@ function createParts<
     restore: false,
   }).make({
     init: () => ({ handle: new Handle(), version: 0 }),
+    subscriptions: ({ model }: { model: typeof PrimitiveModel.Type }) => [
+      Subscription.make(
+        "KeepInstance",
+        Stream.suspend(() => keepInstance(model.handle))
+      ),
+    ],
     update: {
       ChangedState: ($: any, { version }: { version: number }) =>
         $.evolve({ version }),
       CalledCallback: ($: any, { name, ...payload }: Call) =>
         $.emit(events[eventName(name)](payload)),
+      PressedCall: (
+        $: any,
+        { method, args }: { method: string; args: readonly unknown[] }
+      ) => $.run(CallApi.make({ handle: $.model.handle, method, args })),
     },
     parts: (p: any, model: typeof PrimitiveModel.Type) => {
       const { handle } = model
       const instance = instanceOf(handle, p.props, `ui-sdk-${p.id("ui")}`)
-      const result: Record<string, unknown> = {
-        state: partState(instance.part("root")),
-      }
+      const decorated: Record<string, any> = {}
       for (const slot of slots) {
-        const decorated = p.part(
-          (builder: any, slotProps: Record<string, unknown> = {}) => {
+        decorated[slot] = p.part(
+          (builder: any, slotProps: Record<string, unknown>) => {
             const part = instance.part(slot, slotProps)
             const mapKey = `${slot}:${part.key}`
             handle.parts.set(mapKey, part)
-            const mount =
-              slot === "root"
-                ? KeepInstance({ handle, part: mapKey })
-                : BindPart({ handle, part: mapKey })
-            return builder.onMount(mount).forward((node: any) => {
-              const author = node.elementAttrs as Record<string, string>
-              takeOwnId(part, author.id)
-              return node.attrs(merge(partAttrs(part, slotProps), author))
-            })
+            return builder
+              .onMount(BindPart({ handle, part: mapKey }))
+              .forward((node: any) => {
+                const author = node.elementAttrs as Record<string, string>
+                takeOwnId(part, author.id)
+                return node.attrs(merge(partAttrs(part, slotProps), author))
+              })
           }
         )
-        result[camel(slot)] = View.wrapPart(
-          decorated,
-          (builder: any, slotProps: Record<string, unknown> = {}) =>
-            isPresent(instance.part(slot, slotProps))
-              ? decorated(builder, slotProps)
-              : undefined
-        )
       }
-      return result
+      // How often each slot rendered without its own id, for ids made the
+      // same on the server and the client.
+      const counts: Record<string, number> = {}
+      const resolve = (
+        slot: string,
+        given: Record<string, unknown> = {},
+        around: Around,
+        rendering = true
+      ) => {
+        const specs = slotSchemas[slot] ?? {}
+        const resolved = { ...given }
+        for (const key in specs) {
+          if (resolved[key] !== undefined) {
+            continue
+          }
+          const spec = specs[key]
+          if (kindOf(spec) === "id") {
+            const index = (counts[`${slot}.${key}`] ??= 0)
+            if (rendering) {
+              counts[`${slot}.${key}`]++
+            }
+            resolved[key] = `ui-sdk-${p.id(`${slot}-${key}`, index)}`
+            continue
+          }
+          const from = fromOf(spec, key)
+          const value = from ? around[from.slot]?.[from.prop] : undefined
+          if (value !== undefined) {
+            resolved[key] = value
+          } else if (from && required(spec)) {
+            throw new Error(
+              `${options.name}: apply ${camel(slot)} inside ${camel(from.slot)}, with ${camel(options.name)}.in("${from.slot}", props).`
+            )
+          }
+        }
+        const listKey = keyProps[slot]
+        if (listKey && resolved[listKey] !== undefined) {
+          resolved.id = (
+            instance.api as { internal: { keyOf: (value: unknown) => string } }
+          ).internal.keyOf(resolved[listKey])
+        }
+        return resolved
+      }
+      const call = p.part(
+        (builder: any, method: string, args: readonly unknown[]) =>
+          builder.on("click", PrimitiveMessage.PressedCall({ method, args }))
+      )
+      const calls = new Proxy(
+        {},
+        {
+          get: (_, method) =>
+            typeof method === "string"
+              ? View.wrapPart(call, (builder: any, ...args: unknown[]) =>
+                  call(builder, method, args)
+                )
+              : undefined,
+        }
+      )
+      const build = (around: Around): Record<string, unknown> => {
+        const result: Record<string, unknown> = {
+          state: "root" in definitions ? partState(instance.part("root")) : {},
+          calls,
+          in: (slot: string, given?: Record<string, unknown>) => {
+            const resolved = resolve(slot, given, around)
+            return build({
+              ...around,
+              [slot]: keyProps[slot]
+                ? { ...resolved, value: resolved.id }
+                : resolved,
+            })
+          },
+        }
+        for (const slot of slots) {
+          const read = (given?: Record<string, unknown>) =>
+            instance.part(slot, resolve(slot, given, around, false))
+          result[camel(slot)] = Object.assign(
+            View.wrapPart(
+              decorated[slot],
+              (builder: any, given?: Record<string, unknown>) => {
+                const resolved = resolve(slot, given, around)
+                return isPresent(instance.part(slot, resolved))
+                  ? decorated[slot](builder, resolved)
+                  : undefined
+              }
+            ),
+            {
+              state: (given?: Record<string, unknown>) =>
+                partState(read(given)),
+            }
+          )
+        }
+        return result
+      }
+      return build({})
     },
   } as any)
 
@@ -447,10 +598,16 @@ type EffectEvents<P extends Primitive> = {
  * whether its element is in the page returns `undefined` while it shouldn't be.
  * @experimental
  */
-type EffectPart<Props, Absent = never> = <B extends View.PartTarget<string>>(
-  builder: B,
-  ...props: {} extends Props ? [props?: Props] : [props: Props]
-) => ReturnType<B["attr"]> | Absent
+type EffectPart<Props, State, Absent = never> = {
+  <B extends View.PartTarget<string>>(
+    builder: B,
+    ...props: {} extends Props ? [props?: Props] : [props: Props]
+  ): ReturnType<B["attr"]> | Absent
+  /** The part's state for these props, like a star's for its value. */
+  readonly state: (
+    ...props: {} extends Props ? [props?: Props] : [props: Props]
+  ) => State
+}
 
 /**
  * What a component's `view` closure gets: a part per slot and the state.
@@ -459,9 +616,43 @@ type EffectPart<Props, Absent = never> = <B extends View.PartTarget<string>>(
 type EffectParts<P extends Primitive, Tags, Present = never> = {
   readonly [S in keyof Tags & SlotName<P> as CamelCase<S>]: EffectPart<
     PropsOf<P, S>,
+    StateOf<P, S>,
     S extends Present ? undefined : never
   >
-} & { readonly state: StateOf<P, "root" & SlotName<P>> }
+} & {
+  readonly state: StateOf<P, "root" & SlotName<P>>
+  /**
+   * The parts inside one of the parts, like an accordion item's trigger and
+   * panel, which take what they need from it, like its `value`.
+   */
+  readonly in: <S extends keyof Tags & SlotName<P>>(
+    slot: S,
+    ...props: {} extends PropsOf<P, S>
+      ? [props?: PropsOf<P, S>]
+      : [props: PropsOf<P, S>]
+  ) => EffectParts<P, Tags, Present>
+  /**
+   * A control of yours that calls one of the primitive's api methods when
+   * pressed, like a button that rates 3: `rating.calls.rate(h.button, 3)`.
+   * The call runs as a Command, so the message log names it.
+   */
+  readonly calls: {
+    readonly [M in keyof ApiOf<P> & string]: ApiOf<P>[M] extends (
+      ...args: infer A
+    ) => any
+      ? <B extends View.PartTarget<string>>(
+          builder: B,
+          ...args: Partial<A>
+        ) => ReturnType<B["attr"]>
+      : never
+  }
+}
+
+type ApiOf<P extends Primitive> = TypesOf<P>["api"] extends infer Api
+  ? Api extends object
+    ? Api
+    : {}
+  : {}
 
 export {
   createParts,

@@ -195,6 +195,45 @@ export { Example }
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="pages/index.ts"
+import * as UiSchema from "@effect/ui/UiSchema"
+import * as Html from "@effect/ui/html/Html"
+import * as Schema from "effect/Schema"
+import { MuteButton } from "@/components/ui/mute-button"
+
+const ExampleMessage = UiSchema.TaggedEnum({
+  RequestedMutedChange: { muted: Schema.Boolean },
+})
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Struct({ muted: Schema.Boolean }),
+  message: ExampleMessage,
+}).make({
+  init: () => ({ muted: false }),
+  update: {
+    RequestedMutedChange: ($, { muted }) => $.evolve({ muted }),
+  },
+  view: (h, model) =>
+    MuteButton(h, {
+      props: { muted: model.muted },
+      onEmit: {
+        MutedChange: ({ value }) =>
+          ExampleMessage.RequestedMutedChange({ muted: value }),
+      },
+      view: (muteButton) =>
+        muteButton.root(h.button).children(model.muted ? "Unmute" : "Mute"),
+    }),
+})
+
+export { Example }
+```
+
+A callback option is an event named without `on`, so `onMutedChange` is `MutedChange`, and `update` decides what happens to the Model.
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 Pass the initial value through the `muted` attribute:

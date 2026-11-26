@@ -29,8 +29,19 @@
   "bugs": "https://github.com/vercel-labs/ui/issues",
   "exports": {
     ".": "./src/index.ts",
+    "./agent": "./src/agent.ts",
+    "./collapsible": "./src/collapsible.ts",
+    "./color": "./src/color.ts",
+    "./date": "./src/date.ts",
+    "./gesture": "./src/gesture.ts",
+    "./history": "./src/history.ts",
+    "./image": "./src/image.ts",
+    "./number": "./src/number.ts",
+    "./observe": "./src/observe.ts",
+    "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
-    "./collapsible": "./src/collapsible.ts"
+    "./shortcuts": "./src/shortcuts.ts",
+    "./text-match": "./src/text-match.ts"
   },
   "sideEffects": false,
   "files": [
@@ -43,13 +54,57 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
-      "./primitive": {
-        "types": "./dist/primitive.d.ts",
-        "default": "./dist/primitive.js"
+      "./agent": {
+        "types": "./dist/agent.d.ts",
+        "default": "./dist/agent.js"
       },
       "./collapsible": {
         "types": "./dist/collapsible.d.ts",
         "default": "./dist/collapsible.js"
+      },
+      "./color": {
+        "types": "./dist/color.d.ts",
+        "default": "./dist/color.js"
+      },
+      "./date": {
+        "types": "./dist/date.d.ts",
+        "default": "./dist/date.js"
+      },
+      "./gesture": {
+        "types": "./dist/gesture.d.ts",
+        "default": "./dist/gesture.js"
+      },
+      "./history": {
+        "types": "./dist/history.d.ts",
+        "default": "./dist/history.js"
+      },
+      "./image": {
+        "types": "./dist/image.d.ts",
+        "default": "./dist/image.js"
+      },
+      "./number": {
+        "types": "./dist/number.d.ts",
+        "default": "./dist/number.js"
+      },
+      "./observe": {
+        "types": "./dist/observe.d.ts",
+        "default": "./dist/observe.js"
+      },
+      "./preferences": {
+        "types": "./dist/preferences.d.ts",
+        "default": "./dist/preferences.js"
+      },
+      "./primitive": {
+        "types": "./dist/primitive.d.ts",
+        "default": "./dist/primitive.js"
+      },
+      "./shortcuts": {
+        "types": "./dist/shortcuts.d.ts",
+        "default": "./dist/shortcuts.js"
+      },
+      "./text-match": {
+        "types": "./dist/text-match.d.ts",
+        "default": "./dist/text-match.js"
       }
     }
   },

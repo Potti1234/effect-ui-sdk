@@ -147,6 +147,22 @@ const pointer = usePreference(pointerKind)
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+import { createPointerKind } from "@ui-sdk/core"
+import { preference } from "@ui-sdk/effect/preferences"
+
+const pointerKind = createPointerKind()
+
+// In your component's subscriptions, each change arrives as a message:
+preference(pointerKind, (pointer) =>
+  Message.ChangedPointer({ hover: pointer.hover })
+)
+// pointer.hover: "hover" with a mouse, "none" on a phone, "unknown" on the server
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```ts

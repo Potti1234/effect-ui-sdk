@@ -268,6 +268,34 @@ Then render that text through `findableText`, one empty element per piece, from 
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+import { attach } from "@ui-sdk/effect/primitive"
+
+h.span.onMount(
+  attach(
+    (el) => {
+      virtual.findableText(item.index, el, 0)
+      return () => virtual.findableText(item.index, null, 0)
+    },
+    [item.index]
+  )
+)
+h.span.onMount(
+  attach(
+    (el) => {
+      virtual.findableText(item.index, el, 1)
+      return () => virtual.findableText(item.index, null, 1)
+    },
+    [item.index]
+  )
+)
+```
+
+`attach` runs a behavior on the element while it's in the page, and again when its deps change.
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```ts

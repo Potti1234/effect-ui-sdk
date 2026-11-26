@@ -90,6 +90,13 @@ npm add @ui-sdk/solid
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```bash
+npm add @ui-sdk/effect
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```bash
@@ -194,6 +201,44 @@ export { Example }
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="components/ui/mute-button.ts"
+import { createParts } from "@ui-sdk/effect/primitive"
+import { muteButton } from "@/lib/mute-button"
+
+const MuteButton = createParts(muteButton, {
+  name: "MuteButton",
+  tags: { root: "button" },
+})
+
+export { MuteButton }
+```
+
+`tags: { root: "button" }` says the root part of `MuteButton` goes on a `<button>`. `MuteButton` is an Effect UI headless component: call it in a view, and apply its root part to your button:
+
+```ts title="pages/index.ts"
+import * as Html from "@effect/ui/html/Html"
+import * as Schema from "effect/Schema"
+import { MuteButton } from "@/components/ui/mute-button"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    MuteButton(h, {
+      view: (muteButton) => muteButton.root(h.button).children("Mute"),
+    }),
+})
+
+export { Example }
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 For web components, register a custom element:
@@ -285,6 +330,19 @@ Parts render without styles. Here's a complete look for the button, with hover, 
 <MuteButton class="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 aria-pressed:bg-neutral-900 aria-pressed:text-white">
   Mute
 </MuteButton>
+```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+muteButton
+  .root(
+    h.button.class(
+      "rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400 aria-pressed:bg-neutral-900 aria-pressed:text-white"
+    )
+  )
+  .children("Mute")
 ```
 
 </FrameworkContent>

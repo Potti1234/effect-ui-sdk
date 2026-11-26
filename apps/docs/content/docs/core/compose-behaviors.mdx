@@ -215,6 +215,55 @@ export { Example }
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { createParts } from "@ui-sdk/effect/primitive"
+import * as Schema from "effect/Schema"
+import { rating } from "./rating"
+
+const Rating = createParts(rating, {
+  name: "Rating",
+  tags: { root: "div", star: "button" },
+})
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Rating(h, {
+      view: (rating) =>
+        rating
+          .root(h.div.attr("aria-label", "Rating"))
+          .children(
+            ["1", "2", "3", "4", "5"].map((value, index) =>
+              rating
+                .star(
+                  h.button
+                    .key(value)
+                    .attr(
+                      "aria-label",
+                      `${value} ${index === 0 ? "star" : "stars"}`
+                    ),
+                  { value }
+                )
+                .children("★")
+            )
+          ),
+    }),
+})
+
+export { Example }
+```
+
+Each star part takes its `value` as the part's second argument.
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 Register the parts from your app's browser entry point:

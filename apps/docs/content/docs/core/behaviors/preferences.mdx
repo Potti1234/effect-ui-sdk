@@ -185,6 +185,45 @@ export { Sidebar }
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="sidebar.ts"
+import * as UiSchema from "@effect/ui/UiSchema"
+import * as Html from "@effect/ui/html/Html"
+import { preference } from "@ui-sdk/effect/preferences"
+import * as Schema from "effect/Schema"
+import { sidebarPreference } from "./sidebar-preference"
+
+const SidebarMessage = UiSchema.TaggedEnum({
+  ChangedSidebar: { value: Schema.String },
+})
+
+const Sidebar = Html.component({
+  name: "Sidebar",
+  model: Schema.Struct({ sidebar: Schema.String }),
+  message: SidebarMessage,
+}).make({
+  init: () => ({ sidebar: sidebarPreference.initialState.value }),
+  update: {
+    ChangedSidebar: ($, { value }) => $.evolve({ sidebar: value }),
+  },
+  subscriptions: () => [
+    preference(sidebarPreference, ({ value }) =>
+      SidebarMessage.ChangedSidebar({ value })
+    ),
+  ],
+  view: (h, model) =>
+    h.aside
+      .attr("hidden", model.sidebar === "closed" ? "" : undefined)
+      .children("Sidebar content"),
+})
+
+export { Sidebar }
+```
+
+The Model starts from `initialState`, which the server renders, and the subscription brings the saved value once the page runs. Save a value with `$.run(setPreference(sidebarPreference, "closed"))`.
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```ts title="sidebar.ts"
@@ -284,6 +323,18 @@ function App(props: { children: JSX.Element }) {
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+import { Preferences } from "@ui-sdk/effect/preferences"
+import { skinTone } from "./preferences"
+
+// In your root component's view:
+view: (h) =>
+  Preferences(h, { preferences: [skinTone] }).children(Content(h, {}))
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```html
@@ -377,6 +428,20 @@ function CurrentTone() {
   const tone = usePreference(skinTone)
   return <span>Selected tone: {tone().value}</span>
 }
+```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts
+import { preference } from "@ui-sdk/effect/preferences"
+import { skinTone } from "./preferences"
+
+// In subscriptions:
+preference(skinTone, ({ value }) => Message.ChangedTone({ value }))
+
+// In the view:
+h.span.children(`Selected tone: ${model.tone}`)
 ```
 
 </FrameworkContent>

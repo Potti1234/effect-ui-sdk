@@ -47,6 +47,13 @@ npm add @ui-sdk/core @ui-sdk/solid
 ```
 
 </FrameworkContent>
+<FrameworkContent value="effect">
+
+```bash
+npm add @ui-sdk/core @ui-sdk/effect
+```
+
+</FrameworkContent>
 <FrameworkContent value="web-components">
 
 ```bash
@@ -192,6 +199,52 @@ function MessageReactions() {
     </Reactions>
   )
 }
+
+export { MessageReactions }
+```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="components/message-reactions.ts"
+import * as Html from "@effect/ui/html/Html"
+import { createParts } from "@ui-sdk/effect/primitive"
+import * as Schema from "effect/Schema"
+import { reactions } from "@/lib/reactions"
+
+const Reactions = createParts(reactions, {
+  name: "Reactions",
+  tags: { root: "div", reaction: "button" },
+})
+
+const choices = [
+  { value: "thumbs-up", label: "Thumbs up", emoji: "👍" },
+  { value: "heart", label: "Heart", emoji: "❤️" },
+  { value: "laugh", label: "Laugh", emoji: "😂" },
+  { value: "celebrate", label: "Celebrate", emoji: "🎉" },
+]
+
+const MessageReactions = Html.component({
+  name: "MessageReactions",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Reactions(h, {
+      view: (reactions) =>
+        reactions
+          .root(h.div)
+          .children(
+            choices.map((choice) =>
+              reactions
+                .reaction(h.button.key(choice.value), { value: choice.value })
+                .children(choice.emoji)
+            )
+          ),
+    }),
+})
 
 export { MessageReactions }
 ```
@@ -515,6 +568,55 @@ function MessageReactions() {
     </Reactions>
   )
 }
+
+export { MessageReactions }
+```
+
+</FrameworkContent>
+<FrameworkContent value="effect">
+
+```ts title="components/message-reactions.ts"
+import * as Html from "@effect/ui/html/Html"
+import { createParts } from "@ui-sdk/effect/primitive"
+import * as Schema from "effect/Schema"
+import { reactions } from "@/lib/reactions"
+
+const Reactions = createParts(reactions, {
+  name: "Reactions",
+  tags: { root: "div", reaction: "button" },
+})
+
+const choices = [
+  { value: "thumbs-up", label: "Thumbs up", emoji: "👍" },
+  { value: "heart", label: "Heart", emoji: "❤️" },
+  { value: "laugh", label: "Laugh", emoji: "😂" },
+  { value: "celebrate", label: "Celebrate", emoji: "🎉" },
+]
+
+const MessageReactions = Html.component({
+  name: "MessageReactions",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Reactions(h, {
+      view: (reactions) =>
+        reactions
+          .root(h.div.attr("aria-label", "Reactions"))
+          .children(
+            choices.map((choice) =>
+              reactions
+                .reaction(
+                  h.button.key(choice.value).attr("aria-label", choice.label),
+                  { value: choice.value }
+                )
+                .children(choice.emoji)
+            )
+          ),
+    }),
+})
 
 export { MessageReactions }
 ```

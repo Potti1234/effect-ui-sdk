@@ -137,4 +137,3 @@ test("the server renders the closed trigger with its ARIA", async () => {
   expect(html).toContain('data-slot="collapsible-trigger"')
   expect(html).not.toContain("Content")
 })
-

@@ -259,7 +259,7 @@ Every change the rating makes goes through `change`, which calls `onValueChange`
 </FrameworkContent>
 <FrameworkContent value="effect">
 
-Effect UI has no `cancel()`: a change reaches your `update` after the rating asked for it. Keep the value in your Model, and leave it as it is while you save:
+A change reaches your `update` after the rating asked for it, so keep the value in your Model, and leave it as it is while you save. To call `details.cancel()` instead, pass `onValueChange` itself as a prop: it runs synchronously, before the event.
 
 ```ts
 Rating(h, {

@@ -103,6 +103,8 @@ Handle every event with `onEmit` as a record with one handler per event, or as a
 
 Where React and Solid call `details.cancel()`, keep the value in your Model and don't change it. A change you refuse never reaches the page.
 
+When something has to be decided before the change goes on, pass the callback itself as a prop, like `onOpenChange`. It runs synchronously, with the details, so it can call `details.cancel()`, and the event follows as usual. Keep it for what can't wait for `update`.
+
 ## Read the State
 
 A part's state is on the parts the `view` closure gets, as `collapsible.state`. Read it to change what you render, like a label:

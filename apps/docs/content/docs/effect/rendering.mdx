@@ -131,6 +131,8 @@ const Collapsible = createParts(collapsible, {
 
 Give such a part its children before you apply it: `collapsible.panel(h.div.children(...))`. `createParts` throws when the list doesn't match the primitive, so the types and the page agree.
 
+Effect UI matches unkeyed siblings by position, so an element that leaves the page would rebuild the unkeyed elements after it, and focus on one of them would be lost. Every part keeps its own node by a key it takes unless you give it one. Give your own elements that follow a part that leaves, like a popup, a `key` too: `h.button.key("after")`.
+
 ## Add Logic to a Part
 
 Keep `createParts` when mapping slots to elements is enough. [Custom Parts](./custom-parts) shows how to handle a part's events first, attach a behavior to its element, and call the primitive's api from a control of yours.

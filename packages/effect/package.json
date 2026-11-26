@@ -41,6 +41,7 @@
     "./image": "./src/image.ts",
     "./number": "./src/number.ts",
     "./observe": "./src/observe.ts",
+    "./popover": "./src/popover.ts",
     "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
     "./radio": "./src/radio.ts",
@@ -106,6 +107,10 @@
       "./observe": {
         "types": "./dist/observe.d.ts",
         "default": "./dist/observe.js"
+      },
+      "./popover": {
+        "types": "./dist/popover.d.ts",
+        "default": "./dist/popover.js"
       },
       "./preferences": {
         "types": "./dist/preferences.d.ts",

@@ -55,8 +55,10 @@ class Handle {
   options: Record<string, unknown> | undefined
   callbacks:
     Record<string, (value: unknown, details?: Details) => void> | undefined
-  slotCallbacks: Record<string, (value: unknown, details?: Details) => void> =
-    {}
+  slotCallbacks: Record<string, (...args: unknown[]) => void> = {}
+  // The callbacks the consumer passed, read when core calls them.
+  given: Record<string, unknown> | undefined
+  slotGiven: Record<string, unknown> = {}
   parts = new Map<string, Part>()
   // Each part's attributes as the last render wrote them, and the author's.
   rendered = new Map<
@@ -191,13 +193,18 @@ const BindPart = Mount.makeStream(
           }
           const unbindPart = bind(part, node, host)
           listenForFocus(node)
+          const write = () => writeChanged(next.handle, next.part, part, node)
+          writers.set(node, write)
           const unsubscribe = subscribe(part, () => {
             if (justFocused === node) {
-              writeChanged(next.handle, next.part, part, node)
+              write()
             }
           })
           unbind = () => {
             unsubscribe()
+            if (writers.get(node) === write) {
+              writers.delete(node)
+            }
             unbindPart()
           }
         }
@@ -217,11 +224,14 @@ const BindPart = Mount.makeStream(
     )
 )
 
-// Effect UI renders a change a task after the event that made it. A change
-// to an element that took focus in the same listener, like a radio an arrow
-// key moved to and checked, writes its attributes right away, so a screen
-// reader reading the element as focus arrives hears the new ones. Classes
-// and styles, which merge with the author's, wait for the render.
+// Effect UI renders a change a task after the event that made it. As focus
+// moves, the parts a screen reader reads then write their attributes right
+// away: the focused element and the parts around it, like a popup naming
+// itself after its title as focus enters it, and a change to the element
+// that took focus in the same listener, like a radio an arrow key moved to
+// and checked. Classes and styles, which merge with the author's, wait for
+// the render.
+const writers = new WeakMap<Element, () => void>()
 let justFocused: EventTarget | null = null
 let listening = false
 
@@ -235,6 +245,13 @@ function listenForFocus(el: HTMLElement) {
     (event) => {
       justFocused = event.target
       queueMicrotask(() => (justFocused = null))
+      for (
+        let node = event.target instanceof Element ? event.target : null;
+        node;
+        node = node.parentElement
+      ) {
+        writers.get(node)?.()
+      }
     },
     true
   )
@@ -318,15 +335,37 @@ const keepInstance = (handle: Handle) =>
 // in the page. Their details become plain data: what changed, why and how.
 function callbacksOf(handle: Handle, names: string[]) {
   return (handle.callbacks ??= Object.fromEntries(
-    names.map((name) => [name, relay(handle, eventName(name))])
+    names.map((name) => [
+      name,
+      first(() => handle.given?.[name], relay(handle, eventName(name))),
+    ])
   ))
 }
+
+// A callback the consumer passes runs first, synchronously, for what can't
+// wait for a message, like `details.cancel()`. Then the event goes out.
+const first =
+  (own: () => unknown, then: (...args: any[]) => void) =>
+  (...args: unknown[]) => {
+    const callback = own()
+    if (typeof callback === "function") {
+      callback(...args)
+    }
+    then(...args)
+  }
+
+const isFunction = (value: unknown): value is (...args: any[]) => unknown =>
+  typeof value === "function"
 
 // A callback that relays its call as the event `tag`, with the key of the
 // part it belongs to, like an accordion item's.
 const relay =
   (handle: Handle, tag: string, key?: string) =>
-  (value: unknown, details?: Details) => {
+  (first: unknown, second?: Details) => {
+    // A callback that takes only the details, like `onDismissAttempt`, has no value.
+    const alone = second === undefined && isDetails(first)
+    const value = alone ? undefined : first
+    const details = alone ? first : second
     handle.emit?.({
       name: tag,
       value,
@@ -335,6 +374,11 @@ const relay =
       ...(key === undefined ? {} : { key }),
     })
   }
+
+const isDetails = (value: unknown): value is Details =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { reason?: unknown }).reason === "string"
 
 // The event a slot's callback prop is, like an item's `onOpenChange`: `ItemOpenChange`.
 const slotEventName = (slot: string, prop: string) =>
@@ -448,14 +492,14 @@ function createParts<
   )
   const fields: Schema.Struct.Fields = Object.fromEntries([
     ["id", Schema.optional(Schema.String)],
-    ...optionNames
-      .filter((name) => !isCallback(schema.options[name]))
-      .map((name) => [
-        name,
-        Schema.optional(
-          propSchemas[kindOf(schema.options[name])] ?? Schema.Unknown
-        ),
-      ]),
+    ...optionNames.map((name) => [
+      name,
+      Schema.optional(
+        isCallback(schema.options[name])
+          ? Schema.declare(isFunction)
+          : (propSchemas[kindOf(schema.options[name])] ?? Schema.Unknown)
+      ),
+    ]),
   ])
   const props = Schema.Struct(fields) as unknown as Schema.Codec<
     Record<string, unknown>
@@ -509,6 +553,7 @@ function createParts<
     given: Record<string, unknown>,
     id: string
   ) {
+    handle.given = given
     const next: Record<string, unknown> = {
       ...given,
       ...callbacksOf(handle, callbacks),
@@ -571,7 +616,9 @@ function createParts<
                   fill && !node.content?.length
                     ? node.children(fill(track(() => partState(part))))
                     : node
-                const attrs = merge(partAttrs(part, slotProps), author)
+                const attrs = track(() =>
+                  merge(partAttrs(part, slotProps), author)
+                )
                 handle.rendered.set(mapKey, { attrs, author })
                 return filled.attrs(attrs)
               })
@@ -581,6 +628,9 @@ function createParts<
       // How often each slot rendered without its own id, for ids made the
       // same on the server and the client.
       const counts: Record<string, number> = {}
+      // How often each part rendered, so parts without keys of their own,
+      // like two close buttons, take different element keys.
+      const occurrences: Record<string, number> = {}
       const resolve = (
         slot: string,
         given: Record<string, unknown> = {},
@@ -622,14 +672,15 @@ function createParts<
         }
         const key = String(resolved.id ?? resolved.value ?? "")
         for (const prop of slotCallbacks[slot]) {
-          if (resolved[prop] === undefined) {
-            const tag = slotEventName(slot, prop)
-            resolved[prop] = handle.slotCallbacks[`${tag}:${key}`] ??= relay(
-              handle,
-              tag,
-              key
-            )
+          const tag = slotEventName(slot, prop)
+          const id = `${tag}:${key}`
+          if (rendering) {
+            handle.slotGiven[id] = given[prop]
           }
+          resolved[prop] = handle.slotCallbacks[id] ??= first(
+            () => handle.slotGiven[id],
+            relay(handle, tag, key)
+          )
         }
         const listKey = keyProps[slot]
         if (listKey && resolved[listKey] !== undefined) {
@@ -688,9 +739,20 @@ function createParts<
               decorated[slot],
               (builder: any, given?: Record<string, unknown>) => {
                 const resolved = resolve(slot, given, around)
-                return track(() => isPresent(instance.part(slot, resolved)))
-                  ? decorated[slot](builder, resolved)
-                  : undefined
+                const part = instance.part(slot, resolved)
+                if (!track(() => isPresent(part))) {
+                  return undefined
+                }
+                // Effect UI matches unkeyed siblings by position, so a part
+                // that comes and goes, like a popup, would rebuild the parts
+                // after it. A part keeps its node by a key of its own.
+                const seen = `${slot}:${part.key}`
+                const count = (occurrences[seen] = (occurrences[seen] ?? 0) + 1)
+                const keyed =
+                  builder.elementKey === undefined
+                    ? builder.key(`ui-sdk:${seen}:${count}`)
+                    : builder
+                return decorated[slot](keyed, resolved)
               }
             ),
             {
@@ -739,9 +801,9 @@ type Callback<P extends Primitive, K> =
  * @experimental
  */
 type EffectProps<P extends Primitive> = {
-  readonly [
-    K in Exclude<keyof OptionsOf<P> & string, CallbackKeys<OptionsOf<P>>>
-  ]?: Loosen<OptionsOf<P>[K & keyof OptionsOf<P>]>
+  readonly [K in keyof OptionsOf<P> & string]?: Loosen<
+    OptionsOf<P>[K & keyof OptionsOf<P>]
+  >
 } & { readonly id?: string }
 
 // An Effect UI Model's arrays are readonly, and core never writes to an
@@ -757,15 +819,26 @@ type Loosen<T> = T extends (infer Item)[] ? readonly Item[] | T : T
 type EffectEvents<P extends Primitive, Tags = {}> =
   | {
       [K in CallbackKeys<OptionsOf<P>>]: K extends `on${infer Name}`
-        ? {
-            readonly _tag: Name
-            readonly value: Callback<P, K>[0]
-            readonly reason?: ReasonOf<Callback<P, K>[1]>
-            readonly source?: string
-          }
+        ? { readonly _tag: Name } & Payload<Callback<P, K>>
         : never
     }[CallbackKeys<OptionsOf<P>>]
   | SlotEvents<P, Tags>
+
+// What a callback's event carries: its value, and the reason and source of
+// its details, which a callback like `onDismissAttempt` takes alone.
+type Payload<A extends readonly unknown[]> = A extends readonly [
+  { reason: string },
+]
+  ? {
+      readonly value?: undefined
+      readonly reason?: ReasonOf<A[0]>
+      readonly source?: string
+    }
+  : {
+      readonly value: A[0]
+      readonly reason?: ReasonOf<A[1]>
+      readonly source?: string
+    }
 
 type ReasonOf<Details> = Details extends { reason: infer R } | undefined
   ? R
@@ -785,11 +858,8 @@ type SlotEvents<P extends Primitive, Tags> = {
     [K in CallbackKeys<PropsOf<P, S>>]: K extends `on${infer Name}`
       ? {
           readonly _tag: `${Capitalize<CamelCase<S>>}${Name}`
-          readonly value: SlotCallback<P, S, K>[0]
-          readonly reason?: ReasonOf<SlotCallback<P, S, K>[1]>
-          readonly source?: string
           readonly key?: string
-        }
+        } & Payload<SlotCallback<P, S, K>>
       : never
   }[CallbackKeys<PropsOf<P, S>>]
 }[keyof Tags & SlotName<P>]

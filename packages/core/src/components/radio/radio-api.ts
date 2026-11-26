@@ -105,12 +105,14 @@ function radioGroupApiBody(
 
   const enabled = (item: { props: ItemProps | undefined }) =>
     !item.props?.disabled && !isDisabled(store.get())
+  const itemsListeners = new Set<() => void>()
   // Like native radios: both axes move, disabled items are skipped, and Tab
   // lands on the checked item, or with nothing checked, the first enabled one.
   // Disabling the group is a change of state, which moves the stop on its own.
   const roving = createRovingFocus<RadioGroupStore, ItemProps>(context, {
     slot: slots.item,
     key: "stop",
+    onItemsChange: () => itemsListeners.forEach((listener) => listener()),
     remember: false,
     disabled: (item) => !enabled(item),
     focusable: enabled,
@@ -242,6 +244,14 @@ function radioGroupApiBody(
       roving,
       group: () => element(slots.group),
       radio: (key: string) => element(slots.item, key),
+      // Runs once after items join or leave, like a segmented control's
+      // indicator, whose item can bind after it.
+      onItemsChange(listener: () => void) {
+        itemsListeners.add(listener)
+        return () => {
+          itemsListeners.delete(listener)
+        }
+      },
       // The props its item rendered with, for parts inside an item.
       itemProps: (key: string) =>
         (props(slots.item, key) ?? {}) as { disabled?: boolean },

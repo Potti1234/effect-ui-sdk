@@ -272,8 +272,8 @@ const segmentedControlPrimitive = /* @__PURE__ */ definePrimitive({
               return value === null ? undefined : api.internal.radio(value)
             },
             itemSelector: '[role="radio"]',
-            subscribe: (remeasure) =>
-              store.subscribe(() => {
+            subscribe: (remeasure) => {
+              const unsubscribe = store.subscribe(() => {
                 if (store.get().value === value) {
                   return
                 }
@@ -288,7 +288,15 @@ const segmentedControlPrimitive = /* @__PURE__ */ definePrimitive({
                 el.setAttribute("data-activation-direction", direction)
                 store.set({ direction })
                 remeasure()
-              }),
+              })
+              // An item can bind after the indicator, as in a renderer that
+              // mounts across tasks, and items join and leave later too.
+              const stopItems = api.internal.onItemsChange(remeasure)
+              return () => {
+                unsubscribe()
+                stopItems()
+              }
+            },
             write(box) {
               for (const name of indicatorVariables) {
                 if (box) {

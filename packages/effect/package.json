@@ -31,6 +31,7 @@
     ".": "./src/index.ts",
     "./accordion": "./src/accordion.ts",
     "./agent": "./src/agent.ts",
+    "./button": "./src/button.ts",
     "./checkbox": "./src/checkbox.ts",
     "./collapsible": "./src/collapsible.ts",
     "./color": "./src/color.ts",
@@ -45,6 +46,7 @@
     "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
     "./radio": "./src/radio.ts",
+    "./separator": "./src/separator.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
     "./text-match": "./src/text-match.ts"
@@ -67,6 +69,10 @@
       "./agent": {
         "types": "./dist/agent.d.ts",
         "default": "./dist/agent.js"
+      },
+      "./button": {
+        "types": "./dist/button.d.ts",
+        "default": "./dist/button.js"
       },
       "./checkbox": {
         "types": "./dist/checkbox.d.ts",
@@ -123,6 +129,10 @@
       "./radio": {
         "types": "./dist/radio.d.ts",
         "default": "./dist/radio.js"
+      },
+      "./separator": {
+        "types": "./dist/separator.d.ts",
+        "default": "./dist/separator.js"
       },
       "./shortcuts": {
         "types": "./dist/shortcuts.d.ts",

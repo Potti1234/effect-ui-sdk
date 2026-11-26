@@ -1,0 +1,413 @@
+---
+title: Field
+description: Connect a form control to its label, description, and validation errors.
+---
+
+A field connects a form control to its label, its description and the errors it shows, and wires up `id`, `for` and `aria-describedby` for you.
+
+<ComponentExample
+  name="field/input"
+  caption="Press Username to focus the input, then type a name."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Field`, `FieldSet` and `FieldGroup` are headless components. Their `view` gets these parts:
+
+```text
+Field
+├── field.root
+├── field.label
+├── field.control
+├── field.description
+└── field.error
+
+FieldSet
+├── set.set
+├── set.legend
+└── set.description
+
+FieldGroup
+└── group.group
+```
+
+## Usage
+
+Call it in your view and apply its parts. Apply `control` to the control's own element:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Field } from "@ui-sdk/effect/field"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Field(h, {
+      view: (field) =>
+        field.root(h.div).children(
+          field.label(h.label).children("Username"),
+          field.control(
+            h.input.attrs({
+              name: "username",
+              autocomplete: "username",
+              required: "",
+            })
+          ),
+          field.description(h.p).children("This is your public name."),
+          field.error(h.p)
+        ),
+    }),
+})
+
+export { Example }
+```
+
+The label names the control, and the description and any error that shows describe it. The error part returns `undefined` while there's no error to show.
+
+Group related fields in a [field set](#field-sets):
+
+```ts
+FieldSet(h, {
+  view: (set) =>
+    set.set(h.fieldset).children(
+      set.legend(h.legend).children("Shipping address"),
+      set.description(h.p).children("Where we deliver your order."),
+      FieldGroup(h, {
+        view: (group) => group.group(h.div).children(street, city),
+      })
+    ),
+})
+```
+
+## Controls
+
+Apply `control` to a native `h.input`, `h.textarea` or `h.select`, and it connects to the field the same way:
+
+```ts
+Field(h, {
+  view: (field) =>
+    field
+      .root(h.div)
+      .children(
+        field.label(h.label).children("Department"),
+        field
+          .control(h.select.attr("name", "department"))
+          .children(
+            h.option.attr("value", "design").children("Design"),
+            h.option.attr("value", "engineering").children("Engineering")
+          )
+      ),
+})
+```
+
+A [Checkbox](./checkbox), [Switch](./switch) or [Radio Group](./radio) inside a field uses the field's label and description: apply `control` to its root, or to a radio group's `group`. Pressing the label toggles a checkbox or switch. A radio group takes the field's label as its name, and each radio keeps a label of its own:
+
+```ts
+Switch(h, {
+  props: { name: "mfa" },
+  view: (control) =>
+    Field(h, {
+      view: (field) =>
+        field
+          .root(h.div)
+          .children(
+            field
+              .control(control.root(h.button))
+              .children(control.thumb(h.span)),
+            control.input(h.input),
+            field.label(h.label).children("Two-factor authentication"),
+            field.description(h.p).children("Ask for a code when you sign in.")
+          ),
+    }),
+})
+```
+
+## Validation
+
+Use native constraints such as `required`, `type="email"`, and `pattern`. Errors appear after a submit attempt and update as the value changes. The first invalid control takes focus.
+
+Leave an error without children to show the browser's message, or pass `match: "valueMissing"` and `match: "typeMismatch"` with your own messages: `field.error(h.p.children("Enter your email address."), { match: "valueMissing" })`. Adding an error part replaces the browser's validation bubble with that message in the page.
+
+<ComponentExample
+  name="field/validation"
+  caption="Press Subscribe with an empty or invalid email, then correct it to clear the error."
+/>
+
+## Errors from Your Code
+
+Pass `invalid` when your server or form library supplies an error. `true` shows it immediately. Clear the value to return to the browser's validation.
+
+Give this error its own text and pass `match: true`. Named matches such as `valueMissing` still refer to native validation. `invalid: false` hides the field's invalid state, but does not make an invalid native control pass validation.
+
+```ts
+Field(h, {
+  props: { invalid: model.serverError ? true : undefined },
+  view: (field) =>
+    field.root(h.div).children(
+      field.label(h.label).children("Email"),
+      field.control(
+        h.input
+          .attrs({ type: "email", name: "email", required: "" })
+          .on("input", () => ExampleMessage.EditedEmail())
+      ),
+      field.error(h.p.children("Enter your email address."), {
+        match: "valueMissing",
+      }),
+      model.serverError &&
+        field.error(h.p.children(model.serverError), { match: true })
+    ),
+})
+```
+
+## Required and Disabled
+
+A required control marks every part with `data-required`, and the parts' state has `required`, so a label can show a mark with CSS alone.
+
+A disabled field disables its control and marks every part with `data-disabled`, the way a [disabled field set](#disabled-field-sets) does for every field inside it.
+
+## Character Count
+
+Keep the text in your Model and show its length in the description. Set `maxlength` on the control to enforce the limit.
+
+```ts
+Field(h, {
+  view: (field) =>
+    field
+      .root(h.div)
+      .children(
+        field.label(h.label).children("Bio"),
+        field.control(
+          h.textarea
+            .attrs({ name: "bio", maxlength: "280" })
+            .on("input", ({ value }) => ExampleMessage.EditedBio({ value }))
+        ),
+        field.description(h.p).children(`${model.bio.length} / 280`)
+      ),
+})
+```
+
+## Forms
+
+The control submits its value under its own `name`. Reset restores the control's default and hides validation errors. Disabled controls are left out of the submitted values.
+
+## Field Sets
+
+A field set groups related fields under a legend, and disables them together.
+
+<ComponentExample
+  name="field/field-set"
+  caption="Move through the address fields. Their legend and description name the group."
+/>
+
+Apply the set to a native `h.fieldset` and the legend to a native `h.legend`, so the set is named, and disabled, before scripts run. Keep the legend the first child. A legend applied to another element, like `set.legend(h.div)`, still names the set through `aria-labelledby`.
+
+The set's `description`, right inside the set and outside any `Field`, describes the set, so screen readers read it as focus enters. A `FieldGroup`'s `group` stacks the fields, with no role and no state: the field set is what names and disables a group.
+
+## Disabled Field Sets
+
+Disabling the set disables its controls and nested field sets. The form leaves their values out of submissions.
+
+```ts
+FieldSet(h, {
+  props: { disabled: model.sameAsShipping },
+  view: (set) =>
+    set.set(h.fieldset).children(
+      set.legend(h.legend).children("Billing address"),
+      Field(h, {
+        view: (field) =>
+          field.root(h.div).children(
+            field.label(h.label).children("Street address"),
+            field.control(
+              h.input.attrs({
+                name: "billing-street",
+                autocomplete: "billing street-address",
+              })
+            )
+          ),
+      })
+    ),
+})
+```
+
+## Groups in a Field Set
+
+The legend names a [checkbox group](./checkbox#group) or a [radio group](./radio) inside the set, so the group needs no label of its own.
+
+```ts
+FieldSet(h, {
+  view: (set) =>
+    set.set(h.fieldset).children(
+      set.legend(h.legend).children("Notifications"),
+      CheckboxGroup(h, {
+        props: { name: "notify", defaultValue: ["mentions"] },
+        view: (notify) =>
+          notify
+            .group(h.div)
+            .children(
+              option(notify, "mentions", "Mentions"),
+              option(notify, "follows", "New followers"),
+              notify.input(h.input)
+            ),
+      })
+    ),
+})
+```
+
+## Custom Rendering
+
+Apply a part to any element's builder to render it as that element. Read the field's state from `field.state`, or a part's with `state()`:
+
+```ts
+field
+  .description(h.p)
+  .children(
+    field.state.invalid
+      ? "Use letters and numbers only."
+      : "Letters and numbers."
+  )
+```
+
+An error's state also has the `message` for the current problem, which an error without children shows.
+
+State is read lazily. The field renders again for a change only if the last render read that value. Each part's state is listed under [State](#state).
+
+## Custom Controls
+
+Any element of yours joins the field through `control`: the field gives it the `id`, `aria-labelledby`, `aria-describedby`, `aria-invalid`, `disabled` and the field's data attributes, and learns which element is its control. The control keeps its own `data-slot`.
+
+```ts
+field.control(
+  h.input.attrs({
+    type: "tel",
+    name: "phone",
+    autocomplete: "tel",
+    required: "",
+    "data-slot": "phone-input",
+  })
+)
+```
+
+The field reads validity from the native inputs, selects and textareas inside it, so `required` and `pattern` work on the input above. A control that isn't a native input, like a row of buttons, takes part through a native input of its own: ours give it as a part, visually hidden, beside the control.
+
+To build a control from scratch on the primitives ours use, see [Primitives](../../core/kernel/define-a-primitive).
+
+## Styling
+
+Use `data-invalid` and `data-valid` for validation, and `data-focused`, `data-required` and `data-disabled` for the rest. Every part of a field gets the same attributes, so a label can turn red with its control.
+
+Each part has a `data-slot`, such as `field-label`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+## Data Attributes
+
+### root [#data-attributes-field]
+
+<DataAttributes component="field" part="root" />
+
+### label [#data-attributes-fieldlabel]
+
+<DataAttributes component="field" part="label" />
+
+### control [#data-attributes-fieldcontrol]
+
+<DataAttributes component="field" part="control" />
+
+### description [#data-attributes-fielddescription]
+
+<DataAttributes component="field" part="description" />
+
+### error [#data-attributes-fielderror]
+
+<DataAttributes component="field" part="error" />
+
+### FieldSet [#data-attributes-fieldset]
+
+`FieldGroup`'s `group` has `data-slot="field-group"` and no state attributes.
+
+<DataAttributes component="field-set" part="set" />
+
+### legend [#data-attributes-fieldlegend]
+
+<DataAttributes component="field-set" part="legend" />
+
+### description in a FieldSet [#data-attributes-fieldset-description]
+
+<DataAttributes component="field-set" part="description" />
+
+## API Reference
+
+Props are the options below.
+
+A field has no events. Read its state from the parts' data attributes, or from `state`. Pass `debug` to log every state change and its reason.
+
+### Field
+
+<TypeTable
+  path="../../packages/core/src/components/field/field.ts"
+  name="FieldOptions"
+/>
+
+### error
+
+<TypeTable
+  path="../../packages/core/src/components/field/field.ts"
+  name="FieldErrorProps"
+/>
+
+### FieldSet
+
+<TypeTable
+  path="../../packages/core/src/components/field/field-set.ts"
+  name="FieldSetOptions"
+/>
+
+### State
+
+<StateTable
+  path="../../packages/core/src/components/field/field.ts"
+  name="FieldState"
+/>
+
+<StateTable
+  path="../../packages/core/src/components/field/field.ts"
+  name="FieldErrorState"
+/>
+
+A field's `description` gets the field's state, and a field set's `description` only `disabled`.
+
+<StateTable
+  path="../../packages/core/src/components/field/field.ts"
+  name="FieldDescriptionState"
+/>
+
+Every part of a field set gets the same state.
+
+<StateTable
+  path="../../packages/core/src/components/field/field-set.ts"
+  name="FieldSetState"
+/>
+
+## Accessibility
+
+The label names the control with `aria-labelledby`, beside a native `<label for>` where the control can take one. The description and any error that shows describe it with `aria-describedby`, and an invalid control has `aria-invalid`. The tests below cover these connections and keyboard behavior.
+
+<SpecList spec="field" />
+
+In a field set:
+
+<SpecList spec="field.set" />
+
+In a form:
+
+<SpecList spec="forms.form" />

@@ -40,6 +40,7 @@
     "./history": "./src/history.ts",
     "./image": "./src/image.ts",
     "./label": "./src/label.ts",
+    "./meter": "./src/meter.ts",
     "./number": "./src/number.ts",
     "./observe": "./src/observe.ts",
     "./popover": "./src/popover.ts",
@@ -107,6 +108,10 @@
       "./label": {
         "types": "./dist/label.d.ts",
         "default": "./dist/label.js"
+      },
+      "./meter": {
+        "types": "./dist/meter.d.ts",
+        "default": "./dist/meter.js"
       },
       "./number": {
         "types": "./dist/number.d.ts",

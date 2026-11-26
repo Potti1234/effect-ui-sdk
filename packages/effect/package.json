@@ -47,6 +47,7 @@
     "./radio": "./src/radio.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
+    "./tabs": "./src/tabs.ts",
     "./text-match": "./src/text-match.ts"
   },
   "sideEffects": false,
@@ -131,6 +132,10 @@
       "./switch": {
         "types": "./dist/switch.d.ts",
         "default": "./dist/switch.js"
+      },
+      "./tabs": {
+        "types": "./dist/tabs.d.ts",
+        "default": "./dist/tabs.js"
       },
       "./text-match": {
         "types": "./dist/text-match.d.ts",

@@ -31,9 +31,11 @@
     ".": "./src/index.ts",
     "./accordion": "./src/accordion.ts",
     "./agent": "./src/agent.ts",
+    "./checkbox": "./src/checkbox.ts",
     "./collapsible": "./src/collapsible.ts",
     "./color": "./src/color.ts",
     "./date": "./src/date.ts",
+    "./field": "./src/field.ts",
     "./gesture": "./src/gesture.ts",
     "./history": "./src/history.ts",
     "./image": "./src/image.ts",
@@ -41,7 +43,9 @@
     "./observe": "./src/observe.ts",
     "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
+    "./radio": "./src/radio.ts",
     "./shortcuts": "./src/shortcuts.ts",
+    "./switch": "./src/switch.ts",
     "./text-match": "./src/text-match.ts"
   },
   "sideEffects": false,
@@ -63,6 +67,10 @@
         "types": "./dist/agent.d.ts",
         "default": "./dist/agent.js"
       },
+      "./checkbox": {
+        "types": "./dist/checkbox.d.ts",
+        "default": "./dist/checkbox.js"
+      },
       "./collapsible": {
         "types": "./dist/collapsible.d.ts",
         "default": "./dist/collapsible.js"
@@ -74,6 +82,10 @@
       "./date": {
         "types": "./dist/date.d.ts",
         "default": "./dist/date.js"
+      },
+      "./field": {
+        "types": "./dist/field.d.ts",
+        "default": "./dist/field.js"
       },
       "./gesture": {
         "types": "./dist/gesture.d.ts",
@@ -103,9 +115,17 @@
         "types": "./dist/primitive.d.ts",
         "default": "./dist/primitive.js"
       },
+      "./radio": {
+        "types": "./dist/radio.d.ts",
+        "default": "./dist/radio.js"
+      },
       "./shortcuts": {
         "types": "./dist/shortcuts.d.ts",
         "default": "./dist/shortcuts.js"
+      },
+      "./switch": {
+        "types": "./dist/switch.d.ts",
+        "default": "./dist/switch.js"
       },
       "./text-match": {
         "types": "./dist/text-match.d.ts",

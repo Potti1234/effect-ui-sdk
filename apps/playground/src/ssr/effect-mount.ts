@@ -35,7 +35,8 @@ function mountFixture(root: HTMLElement, fixture: unknown, props: unknown) {
 async function hydrateFixture(
   root: HTMLElement,
   fixture: unknown,
-  props: unknown
+  props: unknown,
+  { manual = false } = {}
 ) {
   const errors: string[] = []
   const page = window as unknown as Record<string, unknown>
@@ -63,14 +64,24 @@ async function hydrateFixture(
     errors.push(args.map(String).join(" "))
     error(...args)
   }
-  return run(
-    HtmlHydrate.hydrateEffect(
-      fixture as Root,
-      props as never,
-      root,
-      state
-    ) as never
-  )
+  const hydrate = () =>
+    run(
+      HtmlHydrate.hydrateEffect(
+        fixture as Root,
+        props as never,
+        root,
+        state
+      ) as never
+    )
+  // With ?hydrate=manual, the page stays server markup until window.hydrate() runs.
+  if (
+    manual &&
+    new URLSearchParams(location.search).get("hydrate") === "manual"
+  ) {
+    page.hydrate = hydrate
+    return
+  }
+  return hydrate()
 }
 
 export { hydrateFixture, mountFixture }

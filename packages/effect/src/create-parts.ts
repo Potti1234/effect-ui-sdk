@@ -18,6 +18,7 @@ import {
   renderVersion,
   sameSlotState,
   schemaOf,
+  subscribe,
   takeOwnId,
   unwatched,
   yieldToAuthor,
@@ -57,6 +58,14 @@ class Handle {
   slotCallbacks: Record<string, (value: unknown, details?: Details) => void> =
     {}
   parts = new Map<string, Part>()
+  // Each part's attributes as the last render wrote them, and the author's.
+  rendered = new Map<
+    string,
+    { attrs: Attrs; author: Readonly<Record<string, string>> }
+  >()
+  // The api for a member to join, like a checkbox its group's, the same
+  // function on every render.
+  join: (() => unknown) | undefined
   // What the last render read of the instance, read again on every change.
   reads: { value: unknown; again: () => unknown }[] = []
   emit: ((call: Call) => void) | undefined
@@ -176,7 +185,21 @@ const BindPart = Mount.makeStream(
           }
           unbind()
           bound = part
-          unbind = part ? bind(part, node, host) : () => {}
+          if (!part) {
+            unbind = () => {}
+            return
+          }
+          const unbindPart = bind(part, node, host)
+          listenForFocus(node)
+          const unsubscribe = subscribe(part, () => {
+            if (justFocused === node) {
+              writeChanged(next.handle, next.part, part, node)
+            }
+          })
+          unbind = () => {
+            unsubscribe()
+            unbindPart()
+          }
         }
         follow(args)
         yield* Effect.addFinalizer(() =>
@@ -193,6 +216,57 @@ const BindPart = Mount.makeStream(
       })
     )
 )
+
+// Effect UI renders a change a task after the event that made it. A change
+// to an element that took focus in the same listener, like a radio an arrow
+// key moved to and checked, writes its attributes right away, so a screen
+// reader reading the element as focus arrives hears the new ones. Classes
+// and styles, which merge with the author's, wait for the render.
+let justFocused: EventTarget | null = null
+let listening = false
+
+function listenForFocus(el: HTMLElement) {
+  if (listening) {
+    return
+  }
+  listening = true
+  el.ownerDocument.defaultView?.addEventListener(
+    "focus",
+    (event) => {
+      justFocused = event.target
+      queueMicrotask(() => (justFocused = null))
+    },
+    true
+  )
+}
+
+function writeChanged(
+  handle: Handle,
+  key: string,
+  part: Part,
+  el: HTMLElement
+) {
+  const rendered = handle.rendered.get(key)
+  if (!rendered) {
+    return
+  }
+  const next = merge(partAttrs(part), rendered.author)
+  for (const name in rendered.attrs) {
+    if (!(name in next) && name !== "class" && name !== "style") {
+      el.removeAttribute(name)
+    }
+  }
+  for (const [name, value] of Object.entries(next)) {
+    if (
+      name !== "class" &&
+      name !== "style" &&
+      el.getAttribute(name) !== value
+    ) {
+      el.setAttribute(name, value!)
+    }
+  }
+  rendered.attrs = next
+}
 
 // Keeps the instance for as long as the component lives, reports every
 // change that affects rendering, and relays the instance's callbacks. A
@@ -314,8 +388,10 @@ function merge(own: Attrs, author: Readonly<Record<string, string>>) {
   if (result.style !== undefined && author.style) {
     result.style = `${author.style.replace(/;\s*$/, "")};${result.style}`
   }
+  // A value the part leaves out is the author's, or no one's: writing it as
+  // undefined would remove the author's own.
   for (const name in result) {
-    if (result[name] === undefined && author[name] === undefined) {
+    if (result[name] === undefined) {
       delete result[name]
     }
   }
@@ -334,9 +410,22 @@ function createParts<
   P extends Primitive,
   const Tags extends Partial<Record<SlotName<P>, string>>,
   const Present extends keyof Tags & string = never,
+  const Names extends Partial<Record<keyof Tags & string, string>> = {},
+  const StateSlot extends SlotName<P> = "root" & SlotName<P>,
 >(
   primitive: P,
-  options: { name: string; tags: Tags; present?: readonly Present[] }
+  options: {
+    name: string
+    tags: Tags
+    present?: readonly Present[]
+    names?: Names
+    state?: StateSlot
+    /**
+     * What a part shows when its element has no children of its own, from
+     * the part's state, like a field error's message.
+     */
+    content?: Partial<Record<keyof Tags & string, (state: any) => unknown>>
+  }
 ) {
   const schema = schemaOf(primitive) as {
     options: Record<string, unknown>
@@ -372,6 +461,13 @@ function createParts<
     Record<string, unknown>
   >
   const slots = Object.keys(options.tags)
+  const names = (options.names ?? {}) as Record<string, string | undefined>
+  const nameOf = (slot: string) => names[slot] ?? camel(slot)
+  const slotOf = (name: string) =>
+    Object.keys(names).find((slot) => names[slot] === name) ??
+    slots.find((slot) => camel(slot) === name) ??
+    name
+  const stateSlot: string = options.state ?? "root"
   const slotCallbacks = Object.fromEntries(
     slots.map((slot) => [
       slot,
@@ -470,7 +566,14 @@ function createParts<
               .forward((node: any) => {
                 const author = node.elementAttrs as Record<string, string>
                 takeOwnId(part, author.id)
-                return node.attrs(merge(partAttrs(part, slotProps), author))
+                const fill = options.content?.[slot as keyof Tags & string]
+                const filled =
+                  fill && !node.content?.length
+                    ? node.children(fill(track(() => partState(part))))
+                    : node
+                const attrs = merge(partAttrs(part, slotProps), author)
+                handle.rendered.set(mapKey, { attrs, author })
+                return filled.attrs(attrs)
               })
           }
         )
@@ -500,6 +603,14 @@ function createParts<
             continue
           }
           const from = fromOf(spec, key)
+          if (from && !(from.slot in definitions)) {
+            const index = (counts[`${slot}.${key}`] ??= 0)
+            if (rendering) {
+              counts[`${slot}.${key}`]++
+            }
+            resolved[key] = `${slot}-${index}`
+            continue
+          }
           const value = from ? around[from.slot]?.[from.prop] : undefined
           if (value !== undefined) {
             resolved[key] = value
@@ -552,12 +663,14 @@ function createParts<
       const build = (around: Around): Record<string, unknown> => {
         const result: Record<string, unknown> = {
           get state() {
-            return "root" in definitions
-              ? track(() => partState(instance.part("root")))
+            return stateSlot in definitions
+              ? track(() => partState(instance.part(stateSlot)))
               : {}
           },
           calls,
-          in: (slot: string, given?: Record<string, unknown>) => {
+          join: (handle.join ??= () => handle.instance?.api),
+          in: (name: string, given?: Record<string, unknown>) => {
+            const slot = slotOf(name)
             const resolved = resolve(slot, given, around)
             return build({
               ...around,
@@ -570,7 +683,7 @@ function createParts<
         for (const slot of slots) {
           const read = (given?: Record<string, unknown>) =>
             instance.part(slot, resolve(slot, given, around, false))
-          result[camel(slot)] = Object.assign(
+          result[nameOf(slot)] = Object.assign(
             View.wrapPart(
               decorated[slot],
               (builder: any, given?: Record<string, unknown>) => {
@@ -597,7 +710,7 @@ function createParts<
   return component as unknown as Component.Headless<
     EffectProps<P>,
     EffectEvents<P, Tags>,
-    EffectParts<P, Tags, Present>
+    EffectParts<P, Tags, Present, Names, StateSlot>
   >
 }
 
@@ -702,24 +815,35 @@ type EffectPart<Props, State, Absent = never> = {
  * What a component's `view` closure gets: a part per slot and the state.
  * @experimental
  */
-type EffectParts<P extends Primitive, Tags, Present = never> = {
-  readonly [S in keyof Tags & SlotName<P> as CamelCase<S>]: EffectPart<
+type EffectParts<
+  P extends Primitive,
+  Tags,
+  Present = never,
+  Names = {},
+  StateSlot extends SlotName<P> = "root" & SlotName<P>,
+> = {
+  readonly [S in keyof Tags & SlotName<P> as PartNameOf<S, Names>]: EffectPart<
     PropsOf<P, S>,
     StateOf<P, S>,
     S extends Present ? undefined : never
   >
 } & {
-  readonly state: StateOf<P, "root" & SlotName<P>>
+  readonly state: StateOf<P, StateSlot>
+  /**
+   * What a member passes to join this component, like a checkbox in a
+   * group: `Checkbox(h, { props: { group: toppings.join } })`.
+   */
+  readonly join: () => ApiOf<P>
   /**
    * The parts inside one of the parts, like an accordion item's trigger and
    * panel, which take what they need from it, like its `value`.
    */
-  readonly in: <S extends keyof Tags & SlotName<P>>(
-    slot: S,
-    ...props: {} extends PropsOf<P, S>
-      ? [props?: PropsOf<P, S>]
-      : [props: PropsOf<P, S>]
-  ) => EffectParts<P, Tags, Present>
+  readonly in: <N extends PartNameOf<keyof Tags & SlotName<P>, Names>>(
+    part: N,
+    ...props: {} extends PropsOf<P, SlotFor<P, Tags, Names, N>>
+      ? [props?: PropsOf<P, SlotFor<P, Tags, Names, N>>]
+      : [props: PropsOf<P, SlotFor<P, Tags, Names, N>>]
+  ) => EffectParts<P, Tags, Present, Names, StateSlot>
   /**
    * A control of yours that calls one of the primitive's api methods when
    * pressed, like a button that rates 3: `rating.calls.rate(h.button, 3)`.
@@ -736,6 +860,16 @@ type EffectParts<P extends Primitive, Tags, Present = never> = {
       : never
   }
 }
+
+// A slot's part name: its own in camel case, or the name `names` gives it.
+type PartNameOf<S, Names> = S extends keyof Names
+  ? Names[S] & string
+  : CamelCase<S & string>
+
+// The slot a part name stands for.
+type SlotFor<P extends Primitive, Tags, Names, N> = {
+  [S in keyof Tags & SlotName<P>]: PartNameOf<S, Names> extends N ? S : never
+}[keyof Tags & SlotName<P>]
 
 type ApiOf<P extends Primitive> = TypesOf<P>["api"] extends infer Api
   ? Api extends object

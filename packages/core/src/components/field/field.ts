@@ -180,13 +180,19 @@ function fieldApiBody(
   let wired: HTMLElement[] = []
 
   // Errors in the first render, or revealed by a submit, aren't announced:
-  // the page loading or focus moving to the invalid control reads them.
+  // the page loading or focus moving to the invalid control reads them. A
+  // renderer may show them a task later, like Effect UI, so the quiet lasts
+  // until the next frame.
   let quiet = true
   let quietTimer: ReturnType<typeof setTimeout> | undefined
   function hush() {
     quiet = true
     clearTimeout(quietTimer)
-    quietTimer = setTimeout(() => (quiet = false))
+    quietTimer = setTimeout(() =>
+      typeof requestAnimationFrame === "undefined"
+        ? (quiet = false)
+        : requestAnimationFrame(() => (quiet = false))
+    )
   }
 
   function readValidity(controls: HTMLElement[]) {

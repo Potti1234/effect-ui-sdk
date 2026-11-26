@@ -29,7 +29,7 @@ Apply `root` to a native `<button>`, or to a link or any other element that acts
 
 ## Usage
 
-Call it in your view, apply its part, and handle the press like any element's, with `.on("click", Message)`:
+Call it in your view, apply its part, and turn its `Action` event into your message. The button sends it for each press it accepts, never while it's disabled or pending:
 
 ```ts
 import * as UiSchema from "@effect/ui/UiSchema"
@@ -50,17 +50,15 @@ const Example = Html.component({
   },
   view: (h) =>
     Button(h, {
-      view: (button) =>
-        button
-          .root(h.button.on("click", ExampleMessage.PressedSave()))
-          .children("Save"),
+      onEmit: () => ExampleMessage.PressedSave(),
+      view: (button) => button.root(h.button).children("Save"),
     }),
 })
 
 export { Example }
 ```
 
-Your click handler runs before the button's own, and runs even while the button is disabled with `focusableWhenDisabled` or pending, so check those in `update` when they matter. For work the button should wait for, use `action`.
+A click handler of your own, `.on("click", Message)`, also works. It runs before the button's, and the button drops it while it's disabled with `focusableWhenDisabled` or pending. For work the button should wait for, use `action`.
 
 ## Pending
 
@@ -78,7 +76,7 @@ Button(h, {
 
 After one second, it announces "Loading" to screen readers. Set `pendingAnnouncement` to change that message, as above, or use an empty string to silence it.
 
-`action` runs inside the button's own listener, outside `update`, so it can't send a message. Keep the work it waits for in the Promise, and read the result from the button's state.
+`action` runs inside the button's own listener, just before the `Action` event, so it can't send a message itself. Keep the work it waits for in the Promise, read the result from the button's state, and handle the press in `update` through the event.
 
 <ComponentExample
   name="button/pending"
@@ -134,12 +132,12 @@ The demo reads `button.state` in its view to change the label.
 
 <ComponentExample
   name="button/render"
-  caption="Choose Save Changes. Saving always fails here: the console shows the error and the label changes to Try Again."
+  caption="Choose Save Changes. Saving always fails here, and the label changes to Try Again."
 />
 
 ## Changes After an Await
 
-`action` receives the event and `{ source }`, which says how the button was pressed. If it changes another ui-sdk component after an `await`, wrap that change in `withSource` to keep the original source. Otherwise, the later change is reported as `"programmatic"`.
+`action` receives the event and `{ source }`, which says how the button was pressed. The `Action` event carries the same `source`. If it changes another ui-sdk component after an `await`, wrap that change in `withSource` to keep the original source. Otherwise, the later change is reported as `"programmatic"`.
 
 Here `save()` is your request and `status` is an Input's controller:
 
@@ -177,7 +175,7 @@ Button(h, {
 
 ## Focusable When Disabled
 
-Add `focusableWhenDisabled` when people should still be able to focus a disabled button. It uses `aria-disabled` instead of the native `disabled` attribute. Presses still do nothing: `action` doesn't run, and a click handler of yours should check the same condition in `update`.
+Add `focusableWhenDisabled` when people should still be able to focus a disabled button. It uses `aria-disabled` instead of the native `disabled` attribute. Presses still do nothing: neither `action` nor the `Action` event runs, and the button drops a click handler of yours.
 
 Use `aria-describedby` to explain why the action is unavailable:
 
@@ -268,11 +266,13 @@ What `button.state` holds:
 
 ### Events
 
-Button has no events of its own. A press reaches your `update` through your element's `.on("click", Message)`.
+| Event    | Payload                                                                   |
+| -------- | ------------------------------------------------------------------------- |
+| `Action` | `{ source }`: how the button was pressed. Sent for each press it accepts. |
 
-| Prop     | Receives                                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------------------------- |
-| `action` | The event and `{ source }`, how the button was pressed. A returned Promise keeps it pending until it settles. |
+| Prop     | Receives                                                                                                             |
+| -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `action` | The event and `{ source }`, before the `Action` event. A returned Promise keeps the button pending until it settles. |
 
 ## Accessibility
 

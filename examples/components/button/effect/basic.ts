@@ -19,10 +19,8 @@ const Example = Html.component({
   },
   view: (h) =>
     Button(h, {
-      view: (button) =>
-        button
-          .root(h.button.on("click", ExampleMessage.PressedButton()))
-          .children("Button"),
+      onEmit: () => ExampleMessage.PressedButton(),
+      view: (button) => button.root(h.button).children("Button"),
     }),
 })
 

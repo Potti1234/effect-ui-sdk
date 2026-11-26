@@ -45,13 +45,10 @@ const Example = Html.component({
       h.div.attr("data-slot", "row").children(
         Button(h, {
           props: { disabled: !ready(model.title), focusableWhenDisabled: true },
+          onEmit: () => ExampleMessage.PressedPublish(),
           view: (button) =>
             button
-              .root(
-                h.button
-                  .attr("aria-describedby", "publish-hint")
-                  .on("click", ExampleMessage.PressedPublish())
-              )
+              .root(h.button.attr("aria-describedby", "publish-hint"))
               .children("Publish"),
         }),
         h.p

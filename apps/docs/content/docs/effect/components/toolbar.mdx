@@ -169,7 +169,7 @@ A disabled item stays reachable with `aria-disabled`, so people can find it, but
   caption="Arrow from Reply to Archive, which is disabled but focusable. Delete is skipped. Only Reply logs a press."
 />
 
-Effect UI hears a click before the toolbar refuses it, so leave the `click` handler off a disabled item, or return a message only while `toolbar.button.state(props).disabled` is false.
+Effect UI hears a click before the toolbar can refuse it, so a disabled item drops your own `click` handler. Keep the handler on it; it runs again once the item is enabled.
 
 Set `disabled` on the toolbar to disable every item. The toolbar keeps its tab stop, and its fields can't be edited.
 

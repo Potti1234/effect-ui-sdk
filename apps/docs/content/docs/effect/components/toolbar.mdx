@@ -1,0 +1,328 @@
+---
+title: Toolbar
+description: Give buttons, toggles, menus and fields one tab stop with arrow-key navigation.
+---
+
+Use a Toolbar to group the controls of an editor, a canvas or a table. Tab enters it once, and the arrow keys move between its buttons, toggles, menus and fields.
+
+<ComponentExample
+  name="toolbar/demo"
+  caption="Tab into the toolbar, then use Left and Right to move between Bold, Italic, Underline and Insert link. Press Space to toggle the focused style. The console logs each change."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Toolbar` is one headless component. Its `view` gets these parts:
+
+```text
+Toolbar
+├── toolbar.root
+├── toolbar.button
+├── toolbar.separator
+├── toolbar.group
+│   └── toolbar.in("group", { disabled })
+│       ├── button
+│       └── button
+├── toolbar.link
+└── toolbar.input
+```
+
+Apply buttons, links and fields straight inside the root. `group` names a set of related items, and `toolbar.in("group", { disabled })` gives the items inside it, which take whether the group is disabled from it. `separator` draws a line between sets. Toggles and toggle groups join the toolbar through `toolbarScope(toolbar.join)`.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Toolbar } from "@ui-sdk/effect/toolbar"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Toolbar(h, {
+      view: (toolbar) =>
+        toolbar
+          .root(h.div.attr("aria-label", "Formatting"))
+          .children(
+            toolbar.button(h.button.key("undo")).children("Undo"),
+            toolbar.button(h.button.key("redo")).children("Redo"),
+            toolbar.separator(h.div),
+            toolbar.button(h.button.key("link")).children("Insert Link")
+          ),
+    }),
+})
+
+export { Example }
+```
+
+Name the toolbar with `aria-label`, and give every icon-only control its own. Handle a press with `.on("click", Message)` on the button's builder.
+
+## Build Your Own
+
+`@ui-sdk/effect/toolbar` comes with a ready-made Toolbar. If you'd like to build your own, with your own names, start from the `toolbar` primitive in `@ui-sdk/core`:
+
+```ts title="action-bar.ts"
+import { toolbar } from "@ui-sdk/core/toolbar"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const ActionBar = createParts(toolbar, {
+  name: "ActionBar",
+  tags: { root: "div", button: "button", separator: "div" },
+})
+
+export { ActionBar }
+```
+
+Each part keeps the behavior, state and data attributes of its ready-made counterpart. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Toggle Groups
+
+A [Toggle](./toggle) group inside a toolbar joins its navigation instead of adding another tab stop: pass `toolbarScope(toolbar.join)` as its `toolbar` prop. Its toggles take only the group's `join`. Arrow keys move focus without pressing anything; Enter or Space presses the focused toggle.
+
+```ts
+ToggleGroup(h, {
+  props: { toolbar: toolbarScope(toolbar.join) },
+  view: (group) =>
+    group.group(h.div.attr("aria-label", "Alignment")).children(
+      ["left", "center"].map((value) =>
+        Toggle(h, {
+          key: value,
+          props: { value, group: group.join },
+          view: (toggle) => toggle.root(h.button).children(value),
+        })
+      )
+    ),
+})
+```
+
+A toggle on its own takes `toolbarScope(toolbar.join)` as its `toolbar` prop the same way. `toolbarScope` returns the same function for the same toolbar, so the toggle's props don't change on every render.
+
+<ComponentExample
+  name="toolbar/toggle-group"
+  caption="Arrow from the alignment group to the list group, then press Space on Align center or Numbered list. The console logs each choice."
+/>
+
+## Groups
+
+Use `toolbar.group` to name related controls, and apply the items inside it from `toolbar.in("group", { disabled })`. Set `disabled` on both to disable them together; they stay focusable with `aria-disabled`. A toggle or toggle group inside a group passes the same `disabled` to `toolbarScope(toolbar.join, disabled)`.
+
+<ComponentExample
+  name="toolbar/group"
+  caption="Move through Cut, Copy and Paste into History with the arrow keys. Undo and Redo stay focusable but do nothing."
+/>
+
+## Menus
+
+A [Menu](./menu) trigger joins the toolbar when you apply `toolbar.button` and the menu's trigger to the same builder. In a horizontal toolbar, Down opens the menu while Left and Right keep moving between toolbar items. The Effect Menu isn't available yet.
+
+## Selects
+
+A [Select](./select) trigger joins the same way. It keeps its select behavior while it takes part in the toolbar's focus order. The Effect Select isn't available yet.
+
+## Fields
+
+Apply `toolbar.input` to a text field, or to another field's control, like a [Number Input](./number-input) control. A field keeps Home, End and the arrow keys while they move its caret. At the matching end, with no text selected, an arrow moves to the next item.
+
+Entering a field with an arrow puts its caret at the far end in that direction: press the same arrow again to leave, or the other arrow to edit. A number input keeps Up and Down for stepping its value.
+
+```ts
+toolbar.input(h.input.attrs({ "aria-label": "Find", placeholder: "Find…" }))
+```
+
+## Links
+
+`toolbar.link` joins the same focus order and keeps its link behavior. The demo handles a plain click itself, with `{ preventDefault: true }` on a handler that returns a message only for a plain click, and leaves modified clicks, like opening in a new tab, to the browser.
+
+<ComponentExample
+  name="toolbar/link"
+  caption="Arrow to Files Changed and press Enter. The console logs the page it opened."
+/>
+
+## Vertical
+
+Set `orientation: "vertical"` to move with Up and Down, like a canvas tool palette. Separators turn to run across the toolbar.
+
+<ComponentExample
+  name="toolbar/vertical"
+  caption="Use Up and Down to move between the tools and Delete. Space picks the focused tool."
+/>
+
+## Disabled
+
+A disabled item stays reachable with `aria-disabled`, so people can find it, but it ignores presses, including keys meant for a component rendered through it. Set `focusableWhenDisabled` to `false` to skip it instead.
+
+<ComponentExample
+  name="toolbar/disabled"
+  caption="Arrow from Reply to Archive, which is disabled but focusable. Delete is skipped. Only Reply logs a press."
+/>
+
+Effect UI hears a click before the toolbar refuses it, so leave the `click` handler off a disabled item, or return a message only while `toolbar.button.state(props).disabled` is false.
+
+Set `disabled` on the toolbar to disable every item. The toolbar keeps its tab stop, and its fields can't be edited.
+
+```ts
+Toolbar(h, {
+  props: { disabled: true },
+  view: (toolbar) =>
+    toolbar
+      .root(h.div.attr("aria-label", "Formatting"))
+      .children(
+        toolbar.button(h.button).children("Bold"),
+        toolbar.input(h.input.attr("aria-label", "Find"))
+      ),
+})
+```
+
+## Loop
+
+Arrow keys wrap from the last item to the first by default. Set `loop` to `false` to stop at the ends.
+
+<ComponentExample
+  name="toolbar/loop"
+  caption="Focus Last and press Right. Focus stays there; Home still moves to First."
+/>
+
+## Controller
+
+Create a controller with `createToolbarController` and pass it as `controller`. Its `focus()` moves focus to the item focused last, like the Alt+F10 shortcut editors give their toolbars: call it from a Command. Create one controller per toolbar.
+
+<ComponentExample
+  name="toolbar/controller"
+  caption="Type in Notes, then press Alt+F10 or choose Focus Toolbar. Press a toolbar button and the console logs it."
+/>
+
+## Custom Rendering
+
+Apply a part to any element's builder to render it as that element, and read a part's state with `toolbar.button.state(props)`. To combine a toolbar item with another component's part, like a menu trigger, apply both parts to the same builder. See [Rendering](../rendering) for the rendering contract.
+
+## Styling
+
+Use `data-orientation` on the root for a row or a column, and on a separator for the way its line runs, across the toolbar. Use `data-disabled` to style unavailable items and groups. Toggles inside keep their own `data-pressed`.
+
+Each part has a `data-slot`, such as `toolbar-button`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+## Data Attributes
+
+### toolbar.root [#data-attributes-toolbar]
+
+<DataAttributes component="toolbar" part="root" />
+
+### toolbar.button [#data-attributes-toolbarbutton]
+
+<DataAttributes component="toolbar" part="button" />
+
+### toolbar.link [#data-attributes-toolbarlink]
+
+<DataAttributes component="toolbar" part="link" />
+
+### toolbar.input [#data-attributes-toolbarinput]
+
+<DataAttributes component="toolbar" part="input" />
+
+### toolbar.group [#data-attributes-toolbargroup]
+
+<DataAttributes component="toolbar" part="group" />
+
+### toolbar.separator [#data-attributes-toolbarseparator]
+
+<DataAttributes component="toolbar" part="separator" />
+
+## API Reference
+
+Props are the options below. A toolbar has no events of its own.
+
+### Toolbar
+
+<TypeTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarOptions"
+/>
+
+### toolbar.button
+
+<TypeTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarButtonProps"
+/>
+
+### toolbar.input
+
+<TypeTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarInputProps"
+/>
+
+### toolbar.group
+
+<TypeTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarGroupProps"
+/>
+
+`toolbar.link` and `toolbar.separator` take no props of their own.
+
+### State
+
+What `toolbar.button.state(props)` and `toolbar.input.state(props)` return:
+
+<StateTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarButtonState"
+/>
+
+What `toolbar.link.state()` returns:
+
+<StateTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarLinkState"
+/>
+
+What `toolbar.separator.state()` returns:
+
+<StateTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarSeparatorState"
+/>
+
+### Controller
+
+<ControllerTable
+  path="../../packages/core/src/components/toolbar/toolbar.ts"
+  name="ToolbarController"
+/>
+
+## Accessibility
+
+The toolbar follows the [WAI-ARIA toolbar pattern](https://www.w3.org/WAI/ARIA/apg/patterns/toolbar/). The root has the `toolbar` role and `aria-orientation`, and separators have the `separator` role.
+
+### Keyboard
+
+The toolbar has one tab stop, a roving focus. Tab enters on the first enabled item, then returns to the item focused last. The next Tab leaves the toolbar.
+
+| Key                        | Action                                          |
+| -------------------------- | ----------------------------------------------- |
+| `ArrowRight` / `ArrowLeft` | Move focus in a horizontal toolbar              |
+| `ArrowDown` / `ArrowUp`    | Move focus in a vertical toolbar                |
+| `Home` / `End`             | Focus the first or last item, except in a field |
+| `Enter` / `Space`          | Activate a button or toggle, or open its popup  |
+
+Controls keep the keys they use: Down opens a menu, and Up and Down step a number input. Moving focus never presses a toggle. In right-to-left text, Left and Right swap.
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="toolbar" />

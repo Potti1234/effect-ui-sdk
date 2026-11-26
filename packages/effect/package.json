@@ -32,6 +32,7 @@
     "./accordion": "./src/accordion.ts",
     "./agent": "./src/agent.ts",
     "./avatar": "./src/avatar.ts",
+    "./button": "./src/button.ts",
     "./checkbox": "./src/checkbox.ts",
     "./collapsible": "./src/collapsible.ts",
     "./color": "./src/color.ts",
@@ -49,12 +50,16 @@
     "./primitive": "./src/primitive.ts",
     "./progress": "./src/progress.ts",
     "./radio": "./src/radio.ts",
+    "./rating": "./src/rating.ts",
+    "./segmented-control": "./src/segmented-control.ts",
     "./separator": "./src/separator.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
     "./tabs": "./src/tabs.ts",
     "./text-match": "./src/text-match.ts",
-    "./timeline": "./src/timeline.ts"
+    "./timeline": "./src/timeline.ts",
+    "./toggle": "./src/toggle.ts",
+    "./toolbar": "./src/toolbar.ts"
   },
   "sideEffects": false,
   "files": [
@@ -78,6 +83,10 @@
       "./avatar": {
         "types": "./dist/avatar.d.ts",
         "default": "./dist/avatar.js"
+      },
+      "./button": {
+        "types": "./dist/button.d.ts",
+        "default": "./dist/button.js"
       },
       "./checkbox": {
         "types": "./dist/checkbox.d.ts",
@@ -147,6 +156,14 @@
         "types": "./dist/radio.d.ts",
         "default": "./dist/radio.js"
       },
+      "./rating": {
+        "types": "./dist/rating.d.ts",
+        "default": "./dist/rating.js"
+      },
+      "./segmented-control": {
+        "types": "./dist/segmented-control.d.ts",
+        "default": "./dist/segmented-control.js"
+      },
       "./separator": {
         "types": "./dist/separator.d.ts",
         "default": "./dist/separator.js"
@@ -170,6 +187,14 @@
       "./timeline": {
         "types": "./dist/timeline.d.ts",
         "default": "./dist/timeline.js"
+      },
+      "./toggle": {
+        "types": "./dist/toggle.d.ts",
+        "default": "./dist/toggle.js"
+      },
+      "./toolbar": {
+        "types": "./dist/toolbar.d.ts",
+        "default": "./dist/toolbar.js"
       }
     }
   },

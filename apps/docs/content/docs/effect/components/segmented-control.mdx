@@ -1,0 +1,313 @@
+---
+title: Segmented Control
+description: Pick one of a few options from a row of buttons, with an indicator that slides to the choice.
+---
+
+Use a segmented control to switch between a few views or settings, like List and Grid. It works like a radio group, with one value and a single tab stop, and its indicator slides to the checked item.
+
+<ComponentExample
+  name="segmented-control/basic"
+  caption="Choose Grid, then use the arrow keys to move between views. The label above names the control, as in any field."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`SegmentedControl` is a headless component. Its `view` gets these parts:
+
+```text
+SegmentedControl
+├── control.root
+├── control.indicator
+├── control.item  (value)
+├── control.input (value)
+├── control.item  (value)
+└── control.input (value)
+```
+
+Give each item a `value`, and put its hidden native `input`, with the same `value`, beside it. The control's value is the checked item's value, and the indicator sits behind that item.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { SegmentedControl } from "@ui-sdk/effect/segmented-control"
+import * as Schema from "effect/Schema"
+
+const views = [
+  { value: "list", label: "List" },
+  { value: "grid", label: "Grid" },
+]
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    SegmentedControl(h, {
+      props: { defaultValue: "list" },
+      view: (control) =>
+        control.root(h.div.attr("aria-label", "View")).children(
+          control.indicator(h.span),
+          views.flatMap((view) => [
+            control
+              .item(h.button.key(view.value), { value: view.value })
+              .children(view.label),
+            control.input(h.input.key(`${view.value}-input`), {
+              value: view.value,
+            }),
+          ])
+        ),
+    }),
+})
+
+export { Example }
+```
+
+Name the control with `aria-label`, or put it in a [Field](./field) whose label names it, with `field.control(control.root(h.div))`. Without `defaultValue`, nothing starts checked and Tab enters on the first enabled item.
+
+## Build Your Own
+
+`@ui-sdk/effect/segmented-control` comes with a ready-made SegmentedControl. If you'd like to build your own, with your own names, start from the `segmentedControl` primitive in `@ui-sdk/core`:
+
+```ts title="view-switch.ts"
+import { segmentedControl } from "@ui-sdk/core/segmented-control"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const ViewSwitch = createParts(segmentedControl, {
+  name: "ViewSwitch",
+  tags: { root: "div", item: "button", input: "input", indicator: "span" },
+})
+
+export { ViewSwitch }
+```
+
+Each part keeps the behavior, state and data attributes of its ready-made counterpart. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Indicator
+
+`control.indicator` measures the checked item. Position it inside the control and use its [CSS variables](#styling-indicator) to draw the background that slides to the choice. It measures again when an item or the control changes size, and has no box while nothing is checked. It gets `data-visible` once it has a position. Until then, like on a page rendered on the server before its script runs, its variables are unset, so hide it while it's `:not([data-visible])`.
+
+<StyleTabs>
+
+```css
+[data-slot="segmented-control"] {
+  position: relative;
+  display: inline-flex;
+  isolation: isolate;
+}
+
+[data-slot="segmented-control-indicator"] {
+  position: absolute;
+  z-index: -1;
+  top: var(--segmented-control-indicator-top);
+  left: var(--segmented-control-indicator-left);
+  width: var(--segmented-control-indicator-width);
+  height: var(--segmented-control-indicator-height);
+  transition-property: top, left, width, height;
+  transition-duration: 200ms;
+
+  &[data-activation-direction="none"] {
+    transition: none;
+  }
+}
+```
+
+```ts
+control
+  .root(h.div.attr("aria-label", "View").class("relative isolate inline-flex"))
+  .children(
+    control.indicator(
+      h.span.class(
+        "absolute -z-1 top-(--segmented-control-indicator-top) left-(--segmented-control-indicator-left) w-(--segmented-control-indicator-width) h-(--segmented-control-indicator-height) transition-[top,left,width,height] duration-200 data-[activation-direction=none]:transition-none"
+      )
+    ),
+    items
+  )
+```
+
+</StyleTabs>
+
+Skip the transitions while `data-activation-direction` is `"none"`, so the indicator doesn't slide in on its first placement. After that it says which way the checked item moved: `left`, `right`, `up` or `down`.
+
+Pass `followHover` and it follows the item under the pointer instead, then goes back to the checked item when the pointer leaves the control: `control.indicator(h.span, { followHover: true })`. It passes over disabled items.
+
+## Vertical
+
+Set `orientation: "vertical"` to stack the items. Arrow keys on both axes still move between them, as in any radio group, and `data-orientation` on every part lets one stylesheet lay out both directions.
+
+<ComponentExample
+  name="segmented-control/vertical"
+  caption="Choose Bottom, then press the Up arrow. The indicator follows down the column."
+/>
+
+## Disabled
+
+Set `disabled` on the control, or on one item's `item` and `input`. Disabled items can't be focused or checked, and arrow keys skip them. A disabled control submits nothing.
+
+<ComponentExample
+  name="segmented-control/disabled"
+  caption="The Theme control is disabled. In Billing period, Lifetime is disabled, so the arrow keys move between Monthly and Yearly."
+/>
+
+## Controlled
+
+Keep `value` in your Model, pass it as a prop, and change it in `update` when `ValueChange` arrives. To refuse a change, leave the Model as it is. A [controller](#controller) from `createSegmentedControlController()` checks an item from anywhere, like the Show Month button below: call it from a Command. Create one controller per mounted control.
+
+<ComponentExample
+  name="segmented-control/controlled"
+  caption="Choose Day, then press Show Month. The console logs each change and its reason."
+/>
+
+See [State and Events](../state-and-events) for controlled state, refusing changes and debugging.
+
+## Form
+
+Each item's `input` is a hidden native radio, so the control takes part in forms. Set `name` to submit the checked value; nothing submits without a name or a checked item. `required` blocks submission until there's a choice, `form` joins a form by its id from elsewhere on the page, and a reset returns to `defaultValue`.
+
+<ComponentExample
+  name="segmented-control/form"
+  caption="Choose Dark and Compact, then press Save. The console logs both values, and Reset returns each control to its default."
+/>
+
+## Read-Only
+
+Set `readOnly` to keep the value while still letting people focus the items. Arrow keys move focus without checking anything, and the value still submits with a form.
+
+## Loop
+
+Arrow keys wrap from the last item to the first. Set `loop` to `false` to stop at the ends.
+
+```ts
+SegmentedControl(h, {
+  props: { defaultValue: "list", loop: false },
+  view: (control) => ...,
+})
+```
+
+## Styling
+
+Parts are unstyled. Use `data-checked` and `data-unchecked` for the checked item, and `data-disabled`, `data-readonly` and `data-required` for the rest. `data-orientation` is on the control and the indicator.
+
+Each part has a `data-slot`, such as `segmented-control-item`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+### control.indicator [#styling-indicator]
+
+<CssVariables component="segmented-control" part="indicator" />
+
+## Data Attributes
+
+### control.root [#data-attributes-root]
+
+<DataAttributes component="segmented-control" part="root" />
+
+### control.item [#data-attributes-item]
+
+<DataAttributes component="segmented-control" part="item" />
+
+### control.indicator [#data-attributes-indicator]
+
+<DataAttributes component="segmented-control" part="indicator" />
+
+## API Reference
+
+Props are the options below, without the callbacks, which are [events](#events).
+
+### SegmentedControl
+
+<TypeTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlOptions"
+/>
+
+### control.item
+
+<TypeTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlItemProps"
+/>
+
+`control.input` takes the same `value` and `disabled` as its item.
+
+### control.indicator
+
+<TypeTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlIndicatorProps"
+/>
+
+### State
+
+What `control.state` holds, and what `control.item.state({ value })` and `control.indicator.state()` return.
+
+<StateTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlState"
+/>
+
+<StateTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlItemState"
+/>
+
+<StateTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlIndicatorState"
+/>
+
+### Reasons
+
+An event's `reason` says why the checked value changed.
+
+<ReasonTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlValueChangeReason"
+/>
+
+### Controller
+
+Create one with `createSegmentedControlController()` and pass it as `controller`.
+
+Every write method takes an optional `{ reason, event }`, sends `ValueChange` like a press, and returns `false` when the change does nothing.
+
+<ControllerTable
+  path="../../packages/core/src/components/segmented-control/segmented-control.ts"
+  name="SegmentedControlController"
+/>
+
+### Events
+
+Each event carries plain data, for your messages and your tests. `ValueChange` never arrives on mount.
+
+| Event         | On                 | Carries                                                                    |
+| ------------- | ------------------ | -------------------------------------------------------------------------- |
+| `ValueChange` | `SegmentedControl` | `{ value, reason, source }`: the checked value, and the [reason](#reasons) |
+
+## Accessibility
+
+A segmented control is a radio group, so it follows the [WAI-ARIA radio group pattern](https://www.w3.org/WAI/ARIA/apg/patterns/radio/) and behaves like native radios that share a name. Each `control.item` gets the `radio` role, and its `control.input` is a hidden native radio that takes part in forms. The indicator is presentational, so screen readers skip it.
+
+### Keyboard
+
+| Key        | Does                                                                   |
+| ---------- | ---------------------------------------------------------------------- |
+| Tab        | Moves into the control, onto the checked item or the first enabled one |
+| Arrow keys | Move to the next or previous item and check it, skipping disabled ones |
+| Space      | Checks the focused item                                                |
+| Enter      | Submits its form                                                       |
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="segmented-control" />

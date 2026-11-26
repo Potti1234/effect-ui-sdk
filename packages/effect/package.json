@@ -53,7 +53,8 @@
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
     "./tabs": "./src/tabs.ts",
-    "./text-match": "./src/text-match.ts"
+    "./text-match": "./src/text-match.ts",
+    "./timeline": "./src/timeline.ts"
   },
   "sideEffects": false,
   "files": [
@@ -165,6 +166,10 @@
       "./text-match": {
         "types": "./dist/text-match.d.ts",
         "default": "./dist/text-match.js"
+      },
+      "./timeline": {
+        "types": "./dist/timeline.d.ts",
+        "default": "./dist/timeline.js"
       }
     }
   },

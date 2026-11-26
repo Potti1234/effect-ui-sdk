@@ -1,0 +1,463 @@
+---
+title: Tabs
+description: Switch between related panels with one tab selected at a time.
+---
+
+Use Tabs when several views share the same space, such as settings sections or a preview and its source. Each tab opens the panel with the same value.
+
+<ComponentExample
+  name="tabs/basic"
+  inspect
+  caption="Choose Password to show its panel. Use the left and right arrow keys to move between the tabs."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Tabs` is one headless component. Its `view` gets these parts:
+
+```text
+Tabs
+├── tabs.root
+├── tabs.list
+│   ├── tabs.tab
+│   └── tabs.tab
+├── tabs.panel
+└── tabs.panel
+```
+
+Give each tab and its panel the same unique `value`. Give the list an accessible name. Pass `defaultValue` to choose the initial tab; otherwise, the first enabled tab is selected. On the server, panels that render before the list don't know that tab yet, so a layout with the panels first, like a bottom tab bar, needs `defaultValue` or a controlled `value` to render its panel before hydration.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Tabs } from "@ui-sdk/effect/tabs"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Tabs(h, {
+      props: { defaultValue: "account" },
+      view: (tabs) =>
+        tabs.root(h.div).children(
+          tabs
+            .list(h.div.attr("aria-label", "Settings"))
+            .children(
+              tabs.tab(h.button, { value: "account" }).children("Account"),
+              tabs.tab(h.button, { value: "password" }).children("Password")
+            ),
+          tabs.panel(h.div.children("Manage your profile."), {
+            value: "account",
+          }),
+          tabs.panel(h.div.children("Choose a new password."), {
+            value: "password",
+          })
+        ),
+    }),
+})
+
+export { Example }
+```
+
+A hidden panel's part returns `undefined`, so give it its children before you apply it.
+
+## Build Your Own
+
+`@ui-sdk/effect/tabs` comes with ready-made Tabs. If you'd like to build your own, with your own names, start from the `tabs` primitive in `@ui-sdk/core`:
+
+```ts title="segments.ts"
+import { tabs } from "@ui-sdk/core/tabs"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const Segments = createParts(tabs, {
+  name: "Segments",
+  tags: { root: "div", list: "div", tab: "button", panel: "div" },
+  names: { list: "segmentList", tab: "segment", panel: "segmentPanel" },
+  present: ["panel"],
+})
+
+export { Segments }
+```
+
+Add `"tab-icon": "span"` and `indicator: "span"` to the tags to get the `tabIcon` and `indicator` parts too. Each part keeps the behavior, state and data attributes of its ready-made counterpart. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Vertical
+
+Pass `orientation: "vertical"` to use Up and Down Arrow instead. Style the list as a column beside the panels to match.
+
+<ComponentExample
+  name="tabs/vertical"
+  caption="Focus General, then press Down Arrow to choose Security. Up Arrow moves back through the vertical list."
+/>
+
+To change the orientation with the layout, like a column beside the panels on wide screens and a row above them on phones, keep whether the screen is wide in your Model, from a Subscription on a media query, and pass `orientation` from it. The arrow keys follow it.
+
+```ts
+Tabs(h, {
+  props: {
+    defaultValue: "account",
+    orientation: model.wide ? "vertical" : "horizontal",
+  },
+  view: (tabs) => listAndPanels(tabs),
+})
+```
+
+## Disabled
+
+Pass `disabled` to a tab to prevent selection. Arrow keys can still focus it so people can discover it.
+
+<ComponentExample
+  name="tabs/disabled"
+  caption="Use the arrow keys to reach Reports. It can receive focus, but pressing it leaves the current panel selected."
+/>
+
+## Icons
+
+Put decorative icons in the `tabIcon` part so they stay out of the tab’s accessible name. Pass `mirror` to directional icons, such as Reply, to flip them in right-to-left text. An icon-only tab still needs an `aria-label`.
+
+<ComponentExample
+  name="tabs/icons"
+  caption="Choose Replies. Its directional icon mirrors when the surrounding page uses right-to-left text."
+/>
+
+## Manual Activation
+
+Pass `activation: "manual"` when opening a panel takes time, such as a view that fetches data. Arrow keys move focus; Enter or Space selects the focused tab.
+
+```ts
+Tabs(h, {
+  props: { activation: "manual" },
+  view: (tabs) => listAndPanels(tabs),
+})
+```
+
+A panel becomes a tab stop only when it has no focusable content. A panel with a field lets Tab go straight to the field.
+
+<ComponentExample
+  name="tabs/manual"
+  caption="Focus Preview, then press Right Arrow. Code receives focus; press Enter or Space to show its panel. Tab then moves into the Source field."
+/>
+
+## Loop
+
+Arrow keys normally wrap around at either end. Pass `loop: false` to stop there instead.
+
+<ComponentExample
+  name="tabs/loop"
+  caption="Focus Year and press Right Arrow. Focus stays at the end because looping is off."
+/>
+
+## Indicator
+
+The `indicator` part measures the selected tab. Position it inside a relative tab list and use its [CSS variables](#styling-tabsindicator) to make a marker that follows the selection. It measures again when a tab or the list changes size. It gets `data-visible` once it has a position. Until then, like on a page rendered on the server before its script runs, its variables are unset, so hide it while it's `:not([data-visible])`.
+
+```css
+[data-slot="tabs-list"] {
+  position: relative;
+}
+
+[data-slot="tabs-indicator"] {
+  position: absolute;
+  top: var(--active-tab-top);
+  left: var(--active-tab-left);
+  width: var(--active-tab-width);
+  height: var(--active-tab-height);
+  transition-property: top, left, width, height;
+  transition-duration: 200ms;
+
+  &[data-activation-direction="none"] {
+    transition: none;
+  }
+}
+```
+
+Add transitions for the properties you animate. Skip them while `data-activation-direction="none"` to avoid animating the first placement.
+
+<ComponentExample
+  name="tabs/indicator"
+  caption="Choose Podcasts, then choose Vertical. The same indicator measures and follows the selected tab in either layout."
+/>
+
+Pass it `followHover` and it follows the tab under the pointer instead, then goes back to the selected tab when the pointer leaves the list. The same marker becomes a hover highlight.
+
+## Keep Mounted
+
+Panels normally unmount when another tab is selected. Pass `keepMounted` to a panel to keep its content hidden in the page, preserving local state such as a draft.
+
+<ComponentExample
+  name="tabs/keep-mounted"
+  caption="Write a message, switch to Formatting, then return to Reply. Your draft is still there."
+/>
+
+## Find in Page
+
+Pass `hiddenUntilFound` to the tabs or a panel to keep closed content available to the browser’s Find command. A match selects its tab with the reason `find-in-page`. This also keeps the panel mounted.
+
+`HtmlServer` writes `hidden="until-found"` on hidden panels, so their content is available to Find before hydration.
+
+<ComponentExample
+  name="tabs/find-in-page"
+  caption="Use your browser’s Find command to search for “restocking fee”. Returns opens to reveal the match."
+/>
+
+## Animation
+
+Panels expose `data-starting-style` as they enter and `data-ending-style` as they leave. The previous panel stays mounted through its exit animation, then unmounts or hides if it is kept mounted.
+
+Use `data-activation-direction` to choose a slide direction. Put the panels in the same grid cell so they overlap during the transition, as this example does.
+
+<ComponentExample
+  name="tabs/animation"
+  caption="Move between Overview, Activity and Settings. The panels slide in the direction you moved."
+/>
+
+## Controlled
+
+Keep `value` in your Model, pass it as a prop, and change it in `update` when `ValueChange` arrives. [State and Events](../state-and-events) covers the shared pattern. To refuse a change, leave the Model as it is.
+
+`ValueChange` carries the new value and a [reason](#reasons), such as `item-press`, `list-navigation`, or `imperative`. It isn't sent for the initial selection. A [controller](#controller), called from a Command, lets another control select a tab too.
+
+<ComponentExample
+  name="tabs/controlled"
+  caption="Choose Drafts, then press Show Sent Mail. The console logs each new value with its reason."
+/>
+
+## Links
+
+Apply a tab to a link's builder when selection should navigate. It keeps its tab role; arrow keys follow the link when they select it. Modified clicks, such as Cmd-click, keep their normal browser behavior without selecting the tab.
+
+```ts
+tabs
+  .tab(h.a.attr("href", "#activity"), { value: "activity" })
+  .children("Activity")
+```
+
+<ComponentExample
+  name="tabs/links"
+  caption="Choose Activity. Its panel opens and the URL hash changes. Modified clicks keep the link’s usual browser behavior."
+/>
+
+## Query String
+
+Use the URL as the source of the selected value, and validate it against your tab values. Keep the selected tab in your route's search, pass it as the controlled `value`, and write accepted changes back from `update` with your router's navigation, like `Router.patchSearch`, so browser navigation and the rendered page stay in sync.
+
+## URL Hash
+
+A hash such as `#activity` works on a client-rendered page. Read it from your route, or with a Subscription on `hashchange`, then select the matching tab. Setting `location.hash` adds a history entry. The server cannot read the hash, so give the page an initial tab while it loads.
+
+## Route Tabs
+
+When each tab is a route, render [links](#links) and derive the controlled value from the current path. Let navigation update the value. You do not also need to handle `ValueChange` to navigate to the same route.
+
+## Scroll into View
+
+If the list scrolls, selecting a tab scrolls it into view inside that list, whether you click it, reach it with an arrow key, or select it through a controller or the URL.
+
+## Custom Rendering
+
+Apply a part to any element's builder to render it as that element, as in the [links](#links) example, and read a part's state with `state()`. Each part’s state is listed under [State](#state).
+
+<ComponentExample
+  name="tabs/render"
+  caption="Each tab renders its own button with an unread count after the label. Choose Unread to see who wrote to you."
+/>
+
+## Styling
+
+Parts are unstyled. Use `data-selected` and `data-disabled` to style a tab, and `data-selected` on a panel that shows. `data-orientation` on every part lets one stylesheet lay out horizontal and vertical tabs. Icon parts also set `data-has-icon` on the tab and `data-has-icons` on the list, which can help align mixed text and icon tabs.
+
+The indicator’s position and size are measured from the tab list into the variables below. Use them for an underline, a background, or a marker beside a vertical list.
+
+Each part has a `data-slot`, such as `tabs-tab`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+### indicator [#styling-tabsindicator]
+
+<CssVariables component="tabs" part="indicator" />
+
+## Data Attributes
+
+### root [#data-attributes-tabs]
+
+<DataAttributes component="tabs" part="root" />
+
+### list [#data-attributes-tabslist]
+
+<DataAttributes component="tabs" part="list" />
+
+### tab [#data-attributes-tabstab]
+
+<DataAttributes component="tabs" part="tab" />
+
+### tabIcon [#data-attributes-tabstabicon]
+
+<DataAttributes component="tabs" part="tab-icon" />
+
+### indicator [#data-attributes-tabsindicator]
+
+<DataAttributes component="tabs" part="indicator" />
+
+### panel [#data-attributes-tabspanel]
+
+<DataAttributes component="tabs" part="panel" />
+
+## API Reference
+
+Props are the options below, without the callbacks, which are [events](#events).
+
+### Tabs
+
+<TypeTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsOptions"
+/>
+
+### list
+
+The list takes no options of its own, only the attributes of the element you apply it to.
+
+### tab
+
+<TypeTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsTabProps"
+/>
+
+### tabIcon
+
+<TypeTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsTabIconProps"
+/>
+
+### indicator
+
+<TypeTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsIndicatorProps"
+/>
+
+Its [CSS variables](#styling-tabsindicator) hold the selected tab's box.
+
+### panel
+
+<TypeTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsPanelProps"
+/>
+
+### State
+
+What `tabs.state` holds:
+
+<StateTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsState"
+/>
+
+What `state()` returns for the list:
+
+<StateTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsListState"
+/>
+
+For a tab:
+
+<StateTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsTabState"
+/>
+
+For a tab icon:
+
+<StateTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsTabIconState"
+/>
+
+For a panel:
+
+<StateTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsPanelState"
+/>
+
+For the indicator:
+
+<StateTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsIndicatorState"
+/>
+
+### Reasons
+
+An event's `reason` says why the selection changed.
+
+<ReasonTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsValueChangeReason"
+/>
+
+### Controller
+
+Create one with `createTabsController()` and pass it as `controller`.
+
+Every write method takes an optional `{ reason, event }`, sends `ValueChange` like a press, and returns `false` when the change does nothing.
+
+<ControllerTable
+  path="../../packages/core/src/components/tabs/tabs.ts"
+  name="TabsController"
+/>
+
+### Events
+
+Each event carries plain data, for your messages and your tests. `ValueChange` is never sent on mount.
+
+| Event         | Carries                                                                |
+| ------------- | ---------------------------------------------------------------------- |
+| `ValueChange` | `{ value, reason, source }`: the new value, and the [reason](#reasons) |
+
+## Accessibility
+
+Tabs follow the [WAI-ARIA tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/). The list is a `tablist`, each tab controls its panel, and each panel is labelled by its tab.
+
+### Keyboard
+
+Tab enters the list at the selected tab and leaves it on the next Tab. Left and Right Arrow move between tabs and select them, or only move focus with `activation: "manual"`, where Enter or Space selects. Up and Down Arrow do the same in a vertical list. Home and End move to the first and last tabs. The list reads `dir="rtl"` from the page or any ancestor, and Left and Right follow the reading direction, with no provider.
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList
+  spec="tabs"
+  only={[
+    "selection",
+    "keyboard navigation",
+    "manual activation",
+    "vertical",
+    "panels",
+  ]}
+/>
+
+Beyond the pattern's baseline:
+
+<SpecList spec="tabs.enhancements" />
+
+Screen readers hear the same thing in each tested framework, recorded by a virtual screen reader:
+
+<SpecList spec="tabs.sr" />

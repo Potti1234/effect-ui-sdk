@@ -1,0 +1,133 @@
+---
+title: Label
+description: Name any control with a label, and let a press on the label reach it.
+---
+
+A plain `<label>` only reaches inputs, buttons and selects. Label names any control by its `for`, including a radio group or a slider, and a press on the label moves focus into it.
+
+<ComponentExample
+  name="label/basic"
+  caption="Press Shipping speed. Focus moves to the checked option, and a screen reader names the group Shipping speed."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Usage
+
+Call it in your view, apply its `root` part to a `<label>`, and point its `for` at the control's `id`:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Label } from "@ui-sdk/effect/label"
+import { RadioGroup } from "@ui-sdk/effect/radio"
+import * as Schema from "effect/Schema"
+
+const Plan = Html.component({
+  name: "Plan",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    h.div.children(
+      Label(h, {
+        view: (label) =>
+          label.root(h.label.attr("for", "plan")).children("Plan"),
+      }),
+      RadioGroup(h, {
+        props: { defaultValue: "pro" },
+        view: (plan) =>
+          plan
+            .group(h.div.attr("id", "plan"))
+            .children(
+              plan.radio(h.button, { value: "free" }).children("Free"),
+              plan.radio(h.button, { value: "pro" }).children("Pro")
+            ),
+      })
+    ),
+})
+
+export { Plan }
+```
+
+Label renders a native `<label>`. When the browser can reach the control on its own, like an input, it does. For anything else, the control takes the label as its name, and a press on the label focuses it, checks it or clicks it, as a native label would.
+
+Inside a [Field](./field), use the field's `label` part, which also ties the field's description and errors to the control.
+
+## Build Your Own
+
+`@ui-sdk/effect/label` comes with a ready-made Label. If you'd like to build your own, with your own name, start from the `label` primitive in `@ui-sdk/core`:
+
+```ts title="caption.ts"
+import { label } from "@ui-sdk/core/label"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const Caption = createParts(label, {
+  name: "Caption",
+  tags: { root: "label" },
+})
+
+export { Caption }
+```
+
+```ts
+Caption(h, {
+  view: (caption) => caption.root(h.label.attr("for", "plan")).children("Plan"),
+})
+```
+
+`Caption` keeps the behavior of the ready-made Label: it names the control and reaches it on a press. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Switch
+
+Point the label at a switch beside it. A press on the label turns the switch on and off.
+
+<ComponentExample
+  name="label/switch"
+  caption="Press Email me product updates. The switch turns on."
+/>
+
+## Wrapping a Control
+
+Put the control inside the label instead of pointing at it, and you need no `id`. Call the label inside the control's `view`, so the control's parts can go inside the label.
+
+<ComponentExample
+  name="label/wrap"
+  caption="Press Accept terms and conditions. The checkbox checks, and a double click doesn't select the text."
+/>
+
+## Custom Rendering
+
+Apply the `root` part to another element's builder to use that element, such as `label.root(h.span)`. A label that isn't a `<label>` still names its control and reaches it on a press.
+
+## Styling
+
+The label is unstyled. It has a `data-slot` of `label`.
+
+A double click on the label doesn't select its text, so you don't need `user-select: none` for that.
+
+## API Reference
+
+Props are the options below. Give the element you apply `root` to a native label's `for`.
+
+### Label
+
+<TypeTable
+  path="../../packages/core/src/components/label/label.ts"
+  name="LabelOptions"
+/>
+
+## Accessibility
+
+A native `<label>` names the element its `for` points at only when that element is labelable, like an input or a button. Label names any other control through `aria-labelledby`, unless the control has an `aria-label` or an `aria-labelledby` of its own, which win. Its press does what a native label's does: it checks a checkbox, a switch or a radio, focuses a group's checked radio, and focuses anything else. A press on a disabled control does nothing.
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="label" />

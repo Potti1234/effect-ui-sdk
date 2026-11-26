@@ -1,0 +1,153 @@
+---
+title: Separator
+description: Divide groups of content with a horizontal or vertical line.
+---
+
+Use a separator between groups of content that a reader should take as separate, like a profile's header and its bio.
+
+<ComponentExample
+  name="separator/basic"
+  caption="Read the profile with a screen reader. It announces a separator between Hollis Grant's name and email and the bio below."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Usage
+
+Call it in your view between two groups of content, and apply its `root` part:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Separator } from "@ui-sdk/effect/separator"
+import * as Schema from "effect/Schema"
+
+const Profile = Html.component({
+  name: "Profile",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    h.section.children(
+      h.h2.children("Hollis Grant"),
+      Separator(h, { view: (separator) => separator.root(h.div) }),
+      h.p.children("Designs the billing and onboarding flows.")
+    ),
+})
+
+export { Profile }
+```
+
+## Build Your Own
+
+`@ui-sdk/effect/separator` comes with a ready-made Separator. If you'd like to build your own, with your own name, start from the `separator` primitive in `@ui-sdk/core`:
+
+```ts title="divider.ts"
+import { separator } from "@ui-sdk/core/separator"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const Divider = createParts(separator, {
+  name: "Divider",
+  tags: { root: "div" },
+})
+
+export { Divider }
+```
+
+```ts
+Divider(h, {
+  props: { orientation: "vertical" },
+  view: (divider) => divider.root(h.div),
+})
+```
+
+`Divider` keeps the behavior, state and data attributes of the ready-made Separator: the `separator` role, `aria-orientation` and `data-orientation`. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Vertical
+
+Pass `orientation: "vertical"` for a line between items in a row. It takes the row's height.
+
+<ComponentExample
+  name="separator/vertical"
+  caption="Read across Privacy, Terms and Cookies. A screen reader announces a vertical separator between each link."
+/>
+
+## Stacked Content
+
+A vertical separator stretches to the tallest item in its row, so it spans a number and its label.
+
+<ComponentExample
+  name="separator/menu"
+  caption="Compare the lines with the stats. Each one runs the full height of Projects, Followers and Following."
+/>
+
+## Rows
+
+Put a separator between each pair of rows to divide a list of details.
+
+<ComponentExample
+  name="separator/list"
+  caption="Read the plan details with a screen reader. It announces a separator between Plan, Seats and Renews."
+/>
+
+## Decorative
+
+Pass `decorative` when the line adds no information. Here, the word “or” already says the two ways to sign in are separate, so a screen reader skips the lines.
+
+<ComponentExample
+  name="separator/decorative"
+  caption="Read from Sign In with Passkey to Email Me a Link with a screen reader. It reads “or” and skips the lines."
+/>
+
+A decorative separator gets `role="none"` and no `aria-orientation`. It keeps `data-orientation` for styling.
+
+## Custom Rendering
+
+Apply the `root` part to another element's builder to use that element, such as `separator.root(h.hr)`. Read the separator's state with `separator.state`.
+
+## Styling
+
+The separator is unstyled. Give it a background, a height when it's horizontal and a width when it's vertical, and use `data-orientation` to tell them apart. A vertical line takes its row's height with `align-self: stretch`.
+
+The separator has a `data-slot` of `separator`, and its `data-orientation` is listed under [Data Attributes](#data-attributes).
+
+## Data Attributes
+
+### root [#data-attributes-separator]
+
+<DataAttributes component="separator" part="root" />
+
+## API Reference
+
+Props are the options below.
+
+### Separator
+
+<TypeTable
+  path="../../packages/core/src/components/separator/separator.ts"
+  name="SeparatorOptions"
+/>
+
+### State
+
+What `separator.state` holds.
+
+<StateTable
+  path="../../packages/core/src/components/separator/separator.ts"
+  name="SeparatorState"
+/>
+
+## Accessibility
+
+The component follows the [WAI-ARIA separator role](https://www.w3.org/TR/wai-aria-1.2/#separator). A separator divides content a screen reader should hear as separate, and it's announced with `role="separator"` and its `aria-orientation`. A decorative separator is only visual: it gets `role="none"`, so screen readers skip it. Use `decorative` only when the surrounding content already conveys the division. Either way, a separator never takes focus, so Tab moves past it.
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="separator" />

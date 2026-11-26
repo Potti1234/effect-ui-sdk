@@ -1,0 +1,190 @@
+---
+title: Meter
+description: Show a measurement within a known range, such as storage used or an account quota.
+---
+
+Use a Meter for a value within a known range, such as storage used, a battery level or an account quota. It fills a track to show the value, and screen readers announce the same value.
+
+<ComponentExample
+  name="meter/basic"
+  caption="Read the storage meter. The label names it, and both the visible value and screen reader value report 68%."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Meter` is one headless component. Its `view` gets these parts:
+
+```text
+Meter
+├── meter.root
+├── meter.label
+├── meter.value
+└── meter.track
+    └── meter.indicator
+```
+
+- `root` holds the value and range.
+- `label` gives it a visible name. You can use `aria-label` on the root instead.
+- `value` displays the formatted value.
+- `track` gives the bar its size, and `indicator` fills it.
+
+The value is already part of the root's accessible description. The visible value is hidden from screen readers to avoid reading it twice.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Meter } from "@ui-sdk/effect/meter"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Meter(h, {
+      props: { value: 40 },
+      view: (meter) =>
+        meter
+          .root(h.div)
+          .children(
+            meter.label(h.span).children("Storage"),
+            meter.value(h.span),
+            meter.track(h.div).children(meter.indicator(h.div))
+          ),
+    }),
+})
+
+export { Example }
+```
+
+## Build Your Own
+
+`@ui-sdk/effect/meter` comes with a ready-made Meter. If you'd like to build your own, with your own names, start from the `meter` primitive in `@ui-sdk/core`:
+
+```ts title="quota.ts"
+import { meter } from "@ui-sdk/core/meter"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const Quota = createParts(meter, {
+  name: "Quota",
+  tags: {
+    root: "div",
+    label: "span",
+    value: "span",
+    track: "div",
+    indicator: "div",
+  },
+  names: { indicator: "fill" },
+  content: { value: (state: { text: string }) => state.text },
+})
+
+export { Quota }
+```
+
+The ready-made `value` part shows the formatted value when its element has no children. A part from `createParts` shows only its children, unless `content` says what it shows without them, as above.
+
+Each part keeps the behavior, state and data attributes of its ready-made counterpart: the root is the `meter`, and the indicator sets its width from the value. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Bounds
+
+`min` and `max` set the range. They default to 0 and 100. A value outside the range is clamped for the fill, the percentage and `aria-valuenow`, but the state's `value` and a format other than percent keep it as you passed it. Here, 720 sits about 76% of the way from 300 to 850. Decimal formatting keeps the visible value as 720.
+
+<ComponentExample
+  name="meter/min-max"
+  caption="Compare the score with the filled track. The number shows 720; the fill shows its position between 300 and 850."
+/>
+
+## Format and Locale
+
+Pass `Intl.NumberFormat` options to `format` for units, currency, or decimal places. A function can return custom text, such as the number of occupied seats.
+
+<ComponentExample
+  name="meter/format"
+  caption="Compare the readings. Each meter formats its own value as a unit, currency, custom text, or localized percentage."
+/>
+
+A percent format reports the value's position between `min` and `max`. Other formats use the value itself.
+
+`locale` controls digits and separators. If you omit it, the component reads the page's language after it mounts, with the browser's language as a fallback. The initial server and client render use English.
+
+Set `dir="rtl"` on the surrounding content to fill the track from the right.
+
+## Value Label
+
+Pass `getValueLabel` when a screen reader needs more context than the visible number. It receives the value and details containing `formatted`, `percent`, `min`, and `max`.
+
+<ComponentExample
+  name="meter/value-label"
+  caption="Read API requests with a screen reader. It announces 750 of 1000 requests and 75%, while the visible value stays compact."
+/>
+
+## Changing the Value
+
+Keep the reading in your Model and pass a new `value` when it changes. Meter follows your state and sends no events.
+
+Use [Progress](./progress) for a task that is working toward completion, such as an upload.
+
+## Custom Rendering
+
+Apply a part to any element's builder to render it as that element, and read a part's state with `state()`, like `meter.value.state().text`. Use `format` for text that should be shared by the visible value and screen readers.
+
+## Styling
+
+Give the track a height, background, and width. The indicator sets its width as an inline percentage of the track.
+
+Each part has a `data-slot`, such as `meter-indicator`, and no state attributes: the reading is in `--meter-value` and the indicator's width.
+
+### root [#styling-meter]
+
+The root exposes a CSS variable for positioning other content alongside the reading.
+
+<CssVariables component="meter" part="root" />
+
+## API Reference
+
+Props are the options below.
+
+### Meter
+
+<TypeTable
+  path="../../packages/core/src/components/meter/meter.ts"
+  name="MeterOptions"
+/>
+
+### State
+
+What `meter.state` and every part's `state()` return. Every part gets the same state.
+
+<StateTable
+  path="../../packages/core/src/components/meter/meter.ts"
+  name="MeterState"
+/>
+
+The `value` part's `state()` adds the formatted text:
+
+<StateTable
+  path="../../packages/core/src/components/meter/meter.ts"
+  name="MeterValueState"
+/>
+
+## Accessibility
+
+Name the component with the `label` part or `aria-label`. It exposes the range and formatted value through the `meter` role. Pass `getValueLabel` when that value needs more explanation.
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="meter" />

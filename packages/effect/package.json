@@ -31,6 +31,7 @@
     ".": "./src/index.ts",
     "./accordion": "./src/accordion.ts",
     "./agent": "./src/agent.ts",
+    "./avatar": "./src/avatar.ts",
     "./checkbox": "./src/checkbox.ts",
     "./collapsible": "./src/collapsible.ts",
     "./color": "./src/color.ts",
@@ -39,15 +40,21 @@
     "./gesture": "./src/gesture.ts",
     "./history": "./src/history.ts",
     "./image": "./src/image.ts",
+    "./label": "./src/label.ts",
+    "./meter": "./src/meter.ts",
     "./number": "./src/number.ts",
     "./observe": "./src/observe.ts",
     "./popover": "./src/popover.ts",
     "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
+    "./progress": "./src/progress.ts",
     "./radio": "./src/radio.ts",
+    "./separator": "./src/separator.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
-    "./text-match": "./src/text-match.ts"
+    "./tabs": "./src/tabs.ts",
+    "./text-match": "./src/text-match.ts",
+    "./timeline": "./src/timeline.ts"
   },
   "sideEffects": false,
   "files": [
@@ -67,6 +74,10 @@
       "./agent": {
         "types": "./dist/agent.d.ts",
         "default": "./dist/agent.js"
+      },
+      "./avatar": {
+        "types": "./dist/avatar.d.ts",
+        "default": "./dist/avatar.js"
       },
       "./checkbox": {
         "types": "./dist/checkbox.d.ts",
@@ -100,6 +111,14 @@
         "types": "./dist/image.d.ts",
         "default": "./dist/image.js"
       },
+      "./label": {
+        "types": "./dist/label.d.ts",
+        "default": "./dist/label.js"
+      },
+      "./meter": {
+        "types": "./dist/meter.d.ts",
+        "default": "./dist/meter.js"
+      },
       "./number": {
         "types": "./dist/number.d.ts",
         "default": "./dist/number.js"
@@ -120,9 +139,17 @@
         "types": "./dist/primitive.d.ts",
         "default": "./dist/primitive.js"
       },
+      "./progress": {
+        "types": "./dist/progress.d.ts",
+        "default": "./dist/progress.js"
+      },
       "./radio": {
         "types": "./dist/radio.d.ts",
         "default": "./dist/radio.js"
+      },
+      "./separator": {
+        "types": "./dist/separator.d.ts",
+        "default": "./dist/separator.js"
       },
       "./shortcuts": {
         "types": "./dist/shortcuts.d.ts",
@@ -132,9 +159,17 @@
         "types": "./dist/switch.d.ts",
         "default": "./dist/switch.js"
       },
+      "./tabs": {
+        "types": "./dist/tabs.d.ts",
+        "default": "./dist/tabs.js"
+      },
       "./text-match": {
         "types": "./dist/text-match.d.ts",
         "default": "./dist/text-match.js"
+      },
+      "./timeline": {
+        "types": "./dist/timeline.d.ts",
+        "default": "./dist/timeline.js"
       }
     }
   },

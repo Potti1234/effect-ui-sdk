@@ -1,0 +1,271 @@
+---
+title: Timeline
+description: Show dated events in order, like an activity feed, a changelog or an order's progress, with arrow keys between them.
+---
+
+Use a Timeline for a list of things that happened, or will: a project's activity, an order's status history, a release's milestones. It's a list for screen readers, with one tab stop for keyboards, and the arrow keys move between events.
+
+<ComponentExample
+  name="timeline/demo"
+  caption="Tab into the activity, then use Up and Down to move between events. Home and End jump to the first and last."
+/>
+
+## Installation
+
+```bash
+npm install @ui-sdk/effect @ui-sdk/core
+```
+
+## Composition
+
+`Timeline` is one headless component. Its `view` gets these parts:
+
+```text
+Timeline
+├── timeline.root
+└── timeline.item
+    └── timeline.in("item", { value })
+        ├── marker
+        ├── connector
+        ├── title
+        ├── time
+        └── description
+```
+
+Give every item a unique `value`, and pass the same `value` to `timeline.in("item", { value })` for the parts inside it. Every part inside an item is optional. The `marker` is the dot or icon on the line, and the `connector` the line to the next event. Both are hidden from screen readers, so they're only for looks.
+
+## Usage
+
+Call it in your view and apply its parts:
+
+```ts
+import * as Html from "@effect/ui/html/Html"
+import { Timeline } from "@ui-sdk/effect/timeline"
+import * as Schema from "effect/Schema"
+
+const Example = Html.component({
+  name: "Example",
+  model: Schema.Null,
+  message: Schema.Never,
+}).make({
+  init: () => null,
+  update: ($) => $.model,
+  view: (h) =>
+    Timeline(h, {
+      view: (timeline) => {
+        const deployed = timeline.in("item", { value: "deployed" })
+        return timeline
+          .root(h.div.attr("aria-label", "Activity"))
+          .children(
+            timeline
+              .item(h.div, { value: "deployed" })
+              .children(
+                deployed.marker(h.div),
+                deployed.connector(h.div),
+                deployed.title(h.div).children("Deployed to production"),
+                deployed
+                  .time(h.time.attr("datetime", "2026-11-10T14:32"))
+                  .children("2:32 PM"),
+                deployed.description(h.div).children("Version 2.4.1 is live.")
+              )
+          )
+      },
+    }),
+})
+
+export { Example }
+```
+
+Apply the root and items to `<div>`s: the root takes the `list` role and each item the `listitem` role. With `feed`, the same markup becomes a feed of articles. Apply `time` to a `<time>` with a `datetime`, so the date is machine readable while the text stays friendly.
+
+When focus lands on an event, screen readers read its title as its name, then its time and description. Links and buttons inside an event stay in the tab order: Tab moves from the event to them, and arrow keys pressed on them stay with them.
+
+## Build Your Own
+
+`@ui-sdk/effect/timeline` comes with a ready-made Timeline. If you'd like to build your own, with your own names, start from the `timeline` primitive in `@ui-sdk/core`:
+
+```ts title="history.ts"
+import { timeline } from "@ui-sdk/core/timeline"
+import { createParts } from "@ui-sdk/effect/primitive"
+
+const History = createParts(timeline, {
+  name: "History",
+  tags: { root: "div", item: "div", marker: "div", title: "div", time: "time" },
+  names: { item: "entry" },
+})
+
+export { History }
+```
+
+Each part keeps the behavior, state and data attributes of its ready-made counterpart. See [Rendering](../rendering) and [Custom Parts](../custom-parts) for more.
+
+## Horizontal
+
+Pass `orientation: "horizontal"` for a row, like a roadmap. Left and Right move between events instead of Up and Down, and they swap in right-to-left text. Pass `loop: false` to stop at either end.
+
+<ComponentExample
+  name="timeline/horizontal"
+  caption="Tab into the roadmap and press Right to reach Launch. Right again stays there."
+/>
+
+## Status
+
+Give each item a `status` of `"complete"`, `"current"` or `"upcoming"` for a process, like an order's progress, and pass it to `in("item", { value, status })` too. The current event gets `aria-current="step"`, and Tab lands on it first. Every part of an event shows its status with `data-complete`, `data-current` or `data-upcoming`.
+
+Create a controller with `createTimelineController` and call its `focus()` with an item's `value`, from a Command, to move focus to it from anywhere.
+
+<ComponentExample
+  name="timeline/status"
+  caption="Tab into the order status. Focus starts on Shipped, the current step. Move away, then choose Go to Current Step."
+/>
+
+A marker shows status only to sighted people. When the status matters, say it in the title or description too, like "Shipped, in progress".
+
+## Details
+
+Put a [Collapsible](./collapsible) inside an item for details that can open. Its trigger is a button inside the event, so Tab reaches it after the event, and arrow keys still move between events.
+
+<ComponentExample
+  name="timeline/details"
+  caption="Tab to What Changed under Version 2.4 and press Enter. Shift+Tab back to the event, then press Down for Version 2.3."
+/>
+
+## Feed
+
+Pass `feed` for a timeline that loads more as people scroll, like a social feed. It follows the [WAI-ARIA feed pattern](https://www.w3.org/WAI/ARIA/apg/patterns/feed/): the root becomes a `feed` and each item an `article` with its position and the count, and Page Down and Page Up move between articles from anywhere inside one.
+
+Pass `busy` while you load or change articles. It sets `aria-busy`, so screen readers wait for the new articles before reading on.
+
+<ComponentExample
+  name="timeline/feed"
+  caption="Tab into the updates and press Page Down. Choose Load More: the feed is busy until three more updates arrive. The console logs each load."
+/>
+
+Use a list for most timelines. A feed is for long lists that grow, where a screen reader's reading mode should flow from one article to the next.
+
+## Custom Rendering
+
+Apply any part to another element's builder, like a title to a heading so people can move between events by heading:
+
+```ts
+deployed.title(h.h3).children("Deployed to production")
+```
+
+[Rendering](../rendering) explains how parts apply to elements.
+
+## Styling
+
+The parts have no styles. Lay an item out as a grid, with the marker in its own column and the connector positioned along it. `data-orientation` on every part says which way the events run.
+
+Use `data-first` and `data-last` on items to hide the connector after the last event. They're written once the events are in the page; for markup rendered on the server, `:last-child` does the same before it hydrates.
+
+Each part has a `data-slot`, such as `timeline-marker`, and its state attributes are listed under [Data Attributes](#data-attributes).
+
+The root writes `--timeline-count`, how many events it holds, and each item writes `--timeline-index`, its place from 0. Use them for a horizontal row's grid columns, or to stagger an animation.
+
+### root [#styling-timeline]
+
+<CssVariables component="timeline" part="root" />
+
+### item [#styling-timelineitem]
+
+<CssVariables component="timeline" part="item" />
+
+## Data Attributes
+
+### root [#data-attributes-timeline]
+
+<DataAttributes component="timeline" part="root" />
+
+### item [#data-attributes-timelineitem]
+
+<DataAttributes component="timeline" part="item" />
+
+### marker [#data-attributes-timelinemarker]
+
+<DataAttributes component="timeline" part="marker" />
+
+### connector [#data-attributes-timelineconnector]
+
+<DataAttributes component="timeline" part="connector" />
+
+### time [#data-attributes-timelinetime]
+
+<DataAttributes component="timeline" part="time" />
+
+### title [#data-attributes-timelinetitle]
+
+<DataAttributes component="timeline" part="title" />
+
+### description [#data-attributes-timelinedescription]
+
+<DataAttributes component="timeline" part="description" />
+
+## API Reference
+
+Props are the options below. The parts inside an item take its value and status from `in("item", { value, status })`.
+
+### Timeline
+
+<TypeTable
+  path="../../packages/core/src/components/timeline/timeline.ts"
+  name="TimelineOptions"
+/>
+
+### item
+
+<TypeTable
+  path="../../packages/core/src/components/timeline/timeline.ts"
+  name="TimelineItemProps"
+/>
+
+The `marker`, `connector`, `time`, `title` and `description` take no props of their own.
+
+### State
+
+What `timeline.state` holds:
+
+<StateTable
+  path="../../packages/core/src/components/timeline/timeline.ts"
+  name="TimelineState"
+/>
+
+What `state()` returns for an item and every part inside it:
+
+<StateTable
+  path="../../packages/core/src/components/timeline/timeline.ts"
+  name="TimelineItemState"
+/>
+
+### Controller
+
+Create one with `createTimelineController()`, pass it as `controller`, and call it from a Command.
+
+<ControllerTable
+  path="../../packages/core/src/components/timeline/timeline.ts"
+  name="TimelineController"
+/>
+
+## Accessibility
+
+A timeline is a `list` of `listitem`s, named with `aria-label`. With `feed`, it follows the [WAI-ARIA feed pattern](https://www.w3.org/WAI/ARIA/apg/patterns/feed/): a `feed` of `article`s, each with `aria-posinset` and `aria-setsize`, and `aria-busy` while it loads. Each event is named by its title through `aria-labelledby` and described by its time and description through `aria-describedby`. The current event has `aria-current="step"`.
+
+### Keyboard
+
+The events have one tab stop, a roving focus. Tab enters on the current event, else the first, then returns to the event focused last. Markup rendered on the server holds the stop on the first event until it hydrates.
+
+| Key                        | Action                                                     |
+| -------------------------- | ---------------------------------------------------------- |
+| `ArrowDown` / `ArrowUp`    | Move focus between events in a vertical timeline           |
+| `ArrowRight` / `ArrowLeft` | Move focus between events in a horizontal timeline         |
+| `Home` / `End`             | Focus the first or last event                              |
+| `PageDown` / `PageUp`      | In a feed, focus the next or previous article, from inside |
+| `Tab`                      | Move from an event to the links and buttons inside it      |
+
+Arrow keys move only from an event itself, so controls inside keep them. In right-to-left text, Left and Right swap.
+
+### Tested Behavior
+
+Every line below is an automated test.
+
+<SpecList spec="timeline" />

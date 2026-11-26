@@ -45,6 +45,7 @@
     "./preferences": "./src/preferences.ts",
     "./primitive": "./src/primitive.ts",
     "./radio": "./src/radio.ts",
+    "./separator": "./src/separator.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./switch": "./src/switch.ts",
     "./tabs": "./src/tabs.ts",
@@ -124,6 +125,10 @@
       "./radio": {
         "types": "./dist/radio.d.ts",
         "default": "./dist/radio.js"
+      },
+      "./separator": {
+        "types": "./dist/separator.d.ts",
+        "default": "./dist/separator.js"
       },
       "./shortcuts": {
         "types": "./dist/shortcuts.d.ts",
